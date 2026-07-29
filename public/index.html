@@ -161,6 +161,7 @@
           <div class="field">
             <label class="small">UHID</label>
             <input id="uhid" type="text" readonly />
+            <div id="uhidTimestamp" class="no-print" style="font-size:12px;font-weight:600;color:#334155;margin-top:3px"></div>
           </div>
           <div class="field">
             <label class="small">Date</label>
@@ -881,7 +882,25 @@ async function genUHID(){
     return genUHID_local();
   }
 }
-async function updateUHID(){ uhidEl.value = await genUHID(); form.uhid = uhidEl.value; saveForm(); refreshLinkedBill(); renderXrayGallery(); }
+async function updateUHID(){
+  const wasNew = !form.uhid;
+  uhidEl.value = await genUHID();
+  form.uhid = uhidEl.value;
+  if (wasNew && !form.uhidCreatedAt) form.uhidCreatedAt = new Date().toISOString();
+  renderUhidTimestamp();
+  saveForm();
+  refreshLinkedBill();
+  renderXrayGallery();
+}
+function renderUhidTimestamp(){
+  const el = document.getElementById('uhidTimestamp');
+  if (!el) return;
+  const iso = form.uhidCreatedAt || form.createdAt;
+  if (!iso) { el.textContent = ''; return; }
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) { el.textContent = ''; return; }
+  el.textContent = 'Created: ' + d.toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
 
 /* ------------- procedures populate & sync ------------- */
 function populateProcedureSelects(){ procCode.innerHTML='<option value="">--Code--</option>'; procName.innerHTML='<option value="">--Procedure--</option>'; MASTER.forEach(m=>{ const oc=document.createElement('option'); oc.value=m.code; oc.textContent=m.code; procCode.appendChild(oc); const on=document.createElement('option'); on.value=m.code; on.textContent=m.procedure; procName.appendChild(on); }); procCode.addEventListener('change', ()=>{ const code=procCode.value; procName.value=code||''; }); procName.addEventListener('change', ()=>{ const code=procName.value; procCode.value=code||''; }); }
@@ -1716,18 +1735,25 @@ function patientTimestamp(p){
 function formatCreatedAt(p){
   // Show the doctor-entered visit date (reliable) instead of the server's
   // created_at, which was wrong for many patients due to an old import bug.
+  let dateStr = '';
   const formDate = p.form?.date;
   if (formDate) {
     const d = new Date(formDate);
     if (!isNaN(d.getTime())) {
-      return d.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+      dateStr = d.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
     }
   }
-  const t = p.created_at || p.createdAt;
-  if (!t) return '';
-  const d = new Date(t);
-  if (isNaN(d.getTime())) return '';
-  return d.toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  // Actual save timestamp (has real time-of-day, unlike the visit date field).
+  const t = p.createdAt || p.created_at || p.savedAt || p.updatedAt || p.updated_at;
+  let timeStr = '';
+  if (t) {
+    const d2 = new Date(t);
+    if (!isNaN(d2.getTime())) {
+      timeStr = d2.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
+    }
+  }
+  if (dateStr && timeStr) return `${dateStr}, ${timeStr}`;
+  return dateStr || timeStr || '';
 }
 
 function renderSavedList(search = "") {
@@ -1811,6 +1837,8 @@ visits = data.visits ? [...data.visits] : [];
   dateEl.value = form.date;
   billEl.value = form.billno || '';
   uhidEl.value = data.id;
+  if (!form.uhidCreatedAt) form.uhidCreatedAt = data.createdAt || data.savedAt || '';
+  renderUhidTimestamp();
 
   renderItems();
 renderMeds();

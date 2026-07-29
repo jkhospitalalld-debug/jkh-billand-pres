@@ -254,6 +254,7 @@ tbody tr:hover{background:var(--paper);}
         <label>Date
           <input type="date" id="billDate" onchange="scheduleSave()">
         </label>
+        <div id="billTimestamp" class="no-print" style="font-size:12px;font-weight:600;color:var(--ink);margin-top:3px"></div>
       </div>
     </div>
 
@@ -534,7 +535,7 @@ function addPayment(){
   if(!amt || amt<=0){ toast('Enter a valid payment amount.',true); return; }
   const date=$('payDate').value || new Date().toISOString().slice(0,10);
   const note=$('payNote').value.trim();
-  payments.push({date, amount:amt, note});
+  payments.push({date, amount:amt, note, addedAt:new Date().toISOString()});
   $('payAmount').value=''; $('payNote').value=''; $('payDate').value='';
   renderPayments();
   scheduleSave();
@@ -549,7 +550,7 @@ function renderPayments(){
   if(!body) return;
   body.innerHTML = payments.length ? payments.map((p,i)=>`
     <tr>
-      <td>${p.date||''}</td>
+      <td>${p.date||''}${p.addedAt ? '<div style="font-size:12px;font-weight:600;color:var(--ink)">'+new Date(p.addedAt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})+'</div>' : ''}</td>
       <td>₹${(parseFloat(p.amount)||0).toFixed(2)}</td>
       <td>${p.note||''}</td>
       <td class="no-print"><button class="rowdel" title="Remove payment" onclick="removePayment(${i})">✕</button></td>
@@ -612,6 +613,7 @@ function startFreshBillWithNo(no, params){
   addRow();
   dirty=false;
   setSaveStatus('saved');
+  updateBillTimestamp(null);
 }
 async function newBill(){
   currentBillNo=await nextBillNo();
@@ -624,6 +626,7 @@ async function newBill(){
   addRow();
   dirty=false;
   setSaveStatus('saved');
+  updateBillTimestamp(null);
 }
 function collectBill(){
   return {
@@ -661,6 +664,7 @@ function saveBill(manual){
   if(ok){
     dirty=false;
     setSaveStatus('saved');
+    updateBillTimestamp(bill.updatedAt);
     bumpUnbacked();
     if(manual) toast(`Bill ${bill.no} saved.`);
     apiFetch('/api/bills', { method:'POST', body: bill }).catch(err=>{
@@ -675,6 +679,14 @@ function setSaveStatus(state){
   const dot=$('saveDot'), text=$('saveText');
   dot.className='dot '+state;
   text.textContent = state==='saving' ? 'Saving…' : state==='error' ? 'Save failed — tap Save to retry' : 'All changes saved';
+}
+function updateBillTimestamp(iso){
+  const el=$('billTimestamp');
+  if(!el) return;
+  if(!iso){ el.textContent='Not saved yet'; return; }
+  const d=new Date(iso);
+  if(isNaN(d.getTime())){ el.textContent=''; return; }
+  el.textContent='Last saved: '+d.toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
 }
 
 /* ---------- register ---------- */
@@ -824,6 +836,7 @@ function loadBill(no){
   (b.lines&&b.lines.length? b.lines : [{}]).forEach(l=>addRow({code:l.code,label:l.label||(l.code? procOptionValue(procedures.find(p=>p.code===l.code)||{code:l.code,name:''}) : ''),rate:l.rate,qty:l.qty}));
   calcAll();
   setSaveStatus('saved');
+  updateBillTimestamp(b.updatedAt);
   closeRegister();
   toast(`Loaded bill ${b.no}.`);
 }
