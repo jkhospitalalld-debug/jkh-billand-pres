@@ -1217,6 +1217,18 @@ document.addEventListener('DOMContentLoaded',async ()=>{
 // open that patient's most recent existing bill if one exists anywhere (any device), otherwise
 // start a fresh bill prefilled with their name/age/sex.
 let linkedPatientUHID = '';
+// Bills often get auto-created the moment a UHID is generated - before the
+// doctor has typed the name/age/sex into the OPD form yet. So every time a
+// bill is opened from the OPD form, refresh these 3 fields from whatever the
+// OPD form currently has (never overwrite phone, that's billing-only).
+function syncPatientFieldsFromOPD(params){
+  let changed = false;
+  if(params.get('name') && $('pName').value !== params.get('name')){ $('pName').value = params.get('name'); changed = true; }
+  if(params.get('age') && $('pAge').value !== params.get('age')){ $('pAge').value = params.get('age'); changed = true; }
+  if(params.get('sex') && $('pSex').value !== params.get('sex')){ $('pSex').value = params.get('sex'); changed = true; }
+  if(changed) scheduleSave();
+}
+
 async function applyIncomingPatient(){
   const params = new URLSearchParams(window.location.search);
   const uhid = params.get('uhid');
@@ -1236,6 +1248,7 @@ async function applyIncomingPatient(){
         if(!local.find(x=>x.no===exact.no)){ local.push(exact); writeBills(local); }
         else { const idx = local.findIndex(x=>x.no===exact.no); local[idx] = exact; writeBills(local); }
         loadBill(exact.no);
+        syncPatientFieldsFromOPD(params);
         toast(`Opened bill ${exact.no}`);
         return;
       }
@@ -1256,6 +1269,7 @@ async function applyIncomingPatient(){
         const local = readBills();
         if(!local.find(x=>x.no===existing.no)){ local.push(existing); writeBills(local); }
         loadBill(existing.no);
+        syncPatientFieldsFromOPD(params);
         toast(`Opened existing bill ${existing.no} for this patient.`);
         return;
       }
