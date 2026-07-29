@@ -128,6 +128,7 @@
     <div id="userBar" class="no-print">
       <a href="#" id="billingLink" style="text-decoration:none;padding:6px 10px;border-radius:8px;border:1px dashed var(--border);color:var(--accent);font-weight:700">🧾 Bill this Patient</a>
       <a href="#" id="newBillLink" title="Start a second, separate bill for this same patient" style="text-decoration:none;padding:6px 10px;border-radius:8px;border:1px dashed var(--border);color:var(--muted);font-size:13px">+ New Bill for this Patient</a>
+      <span id="billChips" style="display:inline-flex;gap:6px;vertical-align:middle"></span>
       <span id="whoami"></span>
       <button id="logoutBtn" type="button">Logout</button>
     </div>
@@ -410,9 +411,13 @@ class="btn btn-muted">
 </div>
     <input id="savedSearch" placeholder="Search by name / UHID..."
 style="width:100%;padding:8px;margin-bottom:10px;border:1px solid #ccc;border-radius:8px">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+      <button id="exportSelectedJSON" class="btn btn-muted" style="font-size:13px">⬇ Export Selected</button>
+    </div>
     <table style="width:100%;border-collapse:collapse">
       <thead>
         <tr>
+          <th><input type="checkbox" id="savedSelectAll" title="Select all"></th>
           <th>UHID</th>
           <th>Name</th>
           <th>Visit Date</th>
@@ -496,7 +501,7 @@ async function nextExtraBillNo(uhid) {
   return uhid + 'Z2'; // extremely unlikely fallback if all 26 are used
 }
 
-async function openBillModal(forceNew) {
+async function openBillModal(forceNew, exactNo) {
   const uhid = document.getElementById('uhid').value || '';
   if (!uhid) { alert('Pehle UHID generate hone do.'); return; }
   const params = new URLSearchParams({
@@ -505,7 +510,11 @@ async function openBillModal(forceNew) {
     age: document.getElementById('age').value || '',
     sex: document.getElementById('sex').value || ''
   });
-  if (forceNew) {
+  if (exactNo) {
+    // Open this exact bill (from a chip click) - skip the "latest bill" matching
+    // logic entirely so an older bill never gets swapped for a newer one.
+    params.set('openNo', exactNo);
+  } else if (forceNew) {
     params.set('forceNew', '1');
     params.set('newno', await nextExtraBillNo(uhid));
   }
@@ -775,13 +784,15 @@ async function renderXrayGallery(){
 
 async function refreshLinkedBill(){
   const uhid = uhidEl.value;
-  if (!uhid) { billEl.value=''; return; }
+  const chipsEl = document.getElementById('billChips');
+  if (!uhid) { billEl.value=''; chipsEl.innerHTML=''; return; }
   try {
     const res = await fetch(API_BASE + '/api/bills/by-patient/' + encodeURIComponent(uhid));
     if (!res.ok) throw new Error('server error');
     const bills = await res.json();
     if (bills.length) {
       billEl.value = bills[0].no;
+      renderBillChips(uhid, bills);
       return;
     }
     // No bill exists yet for this patient — auto-generate one now.
@@ -801,12 +812,37 @@ async function refreshLinkedBill(){
         updatedAt: new Date().toISOString()
       }});
       billEl.value = uhid;
+      renderBillChips(uhid, [{ no: uhid, total: '0.00', payments: [] }]);
     } catch (e2) {
       console.warn('Could not auto-create bill:', e2.message);
     }
   } catch (e) {
     console.warn('Could not check for linked bill:', e.message);
   }
+}
+
+// Shows every bill linked to this UHID as a small clickable chip (base bill first,
+// then A, B, C... in order) so an older bill is never orphaned once a 2nd/3rd
+// bill gets created - clicking a chip opens that exact bill, not just the latest one.
+function renderBillChips(uhid, bills) {
+  const chipsEl = document.getElementById('billChips');
+  if (bills.length < 2) { chipsEl.innerHTML = ''; return; }
+  const sorted = [...bills].sort((a, b) => (a.no === uhid ? -1 : b.no === uhid ? 1 : a.no.localeCompare(b.no)));
+  chipsEl.innerHTML = '';
+  sorted.forEach(b => {
+    const label = b.no === uhid ? '1' : b.no.slice(uhid.length);
+    const total = parseFloat(b.total || 0) || 0;
+    const paid = (b.payments || []).reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+    const balance = total - paid;
+    const chip = document.createElement('a');
+    chip.href = '#';
+    chip.textContent = label;
+    chip.title = `Bill ${b.no} — Total ₹${total.toFixed(2)}, Paid ₹${paid.toFixed(2)}, Balance ₹${balance.toFixed(2)}`;
+    chip.style.cssText = 'text-decoration:none;min-width:22px;text-align:center;padding:3px 7px;border-radius:6px;border:1px solid var(--border);font-size:12px;font-weight:700;' +
+      (balance > 0.001 ? 'color:#b91c1c;background:#fef2f2' : 'color:#15803d;background:#f0fdf4');
+    chip.addEventListener('click', (e) => { e.preventDefault(); openBillModal(false, b.no); });
+    chipsEl.appendChild(chip);
+  });
 }
 
 /* ------------- UHID ------------- */
@@ -1707,7 +1743,7 @@ const filtered = [...registry]
   );
 });
   if (filtered.length === 0) {
-    savedBody.innerHTML = '<tr><td colspan="5" style="text-align:center">No saved patients</td></tr>';
+    savedBody.innerHTML = '<tr><td colspan="6" style="text-align:center">No saved patients</td></tr>';
     return;
   }
 
@@ -1716,6 +1752,7 @@ const filtered = [...registry]
     const tr = document.createElement('tr');
 
     tr.innerHTML = `
+      <td><input type="checkbox" class="rowSelect" data-uhid="${p.id}"></td>
       <td>${p.id}</td>
       <td>${p.form.name}</td>
       <td>${formatCreatedAt(p) || p.form.date || ''}</td>
@@ -1752,6 +1789,12 @@ savedBody.querySelectorAll('[data-id]').forEach(btn=>{
     }
   });
 });
+
+  const selectAllEl = document.getElementById('savedSelectAll');
+  selectAllEl.checked = false;
+  selectAllEl.onclick = () => {
+    savedBody.querySelectorAll('.rowSelect').forEach(cb => cb.checked = selectAllEl.checked);
+  };
     }  
 
 function loadPatient(data){
@@ -1808,6 +1851,38 @@ exportJSONBtn.addEventListener('click', async () => {
   a.download = fileName;
   a.click();
 
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('exportSelectedJSON').addEventListener('click', async () => {
+  const selectedUhids = [...savedBody.querySelectorAll('.rowSelect:checked')].map(cb => cb.getAttribute('data-uhid'));
+  if (selectedUhids.length === 0) {
+    alert('Pehle kam se kam ek patient select karein (checkbox se).');
+    return;
+  }
+
+  const selectedPatients = registry.filter(p => selectedUhids.includes(p.id));
+  const selectedSet = new Set(selectedUhids);
+
+  let bills = [], billsTrash = [];
+  try {
+    const allBills = await apiFetch('/api/bills');
+    const allBillsTrash = await apiFetch('/api/bills?trash=1');
+    bills = allBills.filter(b => selectedSet.has(b.patientUHID));
+    billsTrash = allBillsTrash.filter(b => selectedSet.has(b.patientUHID));
+  } catch (e) {
+    console.warn('Could not fetch bills for selected export (patients will still export):', e.message);
+  }
+
+  const dataObj = { patients: selectedPatients, bills, billsTrash, exportedAt: new Date().toISOString() };
+  const dataStr = JSON.stringify(dataObj, null, 2);
+  const blob = new Blob([dataStr], { type: "application/json" });
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `JKH_Selected_${selectedUhids.length}patients_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
   URL.revokeObjectURL(url);
 });
 

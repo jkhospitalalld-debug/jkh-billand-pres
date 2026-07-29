@@ -1210,6 +1210,27 @@ async function applyIncomingPatient(){
   if(!uhid) return;
   linkedPatientUHID = uhid;
   const forceNew = params.get('forceNew') === '1';
+  const openNo = params.get('openNo');
+
+  if(openNo){
+    // Opened from a bill chip on the OPD form - load this exact bill,
+    // never substitute whichever bill happens to be most recently updated.
+    try{
+      const serverBills = await apiFetch('/api/bills/by-patient/' + encodeURIComponent(uhid));
+      const exact = serverBills.find(b => b.no === openNo);
+      if(exact){
+        const local = readBills();
+        if(!local.find(x=>x.no===exact.no)){ local.push(exact); writeBills(local); }
+        else { const idx = local.findIndex(x=>x.no===exact.no); local[idx] = exact; writeBills(local); }
+        loadBill(exact.no);
+        toast(`Opened bill ${exact.no}`);
+        return;
+      }
+    }catch(err){
+      console.warn('Could not load exact bill, falling back:', err.message);
+    }
+    // Fall through to normal matching below if the exact bill wasn't found.
+  }
 
   if(!forceNew){
     try{
