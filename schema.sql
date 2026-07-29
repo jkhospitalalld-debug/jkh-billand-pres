@@ -46,3 +46,13 @@ CREATE TABLE IF NOT EXISTS bill_counters (
   month_key TEXT PRIMARY KEY,
   counter INTEGER NOT NULL DEFAULT 0
 );
+
+-- X-ray images, stored as base64 in D1 (one row per image, per patient UHID)
+CREATE TABLE IF NOT EXISTS xray_images (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  uhid TEXT NOT NULL,
+  filename TEXT,
+  data TEXT NOT NULL,
+  uploaded_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_xray_images_uhid ON xray_images(uhid);
