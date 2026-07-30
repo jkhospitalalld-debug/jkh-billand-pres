@@ -65,6 +65,13 @@
     .btn-primary{background:var(--accent);color:#fff;box-shadow:0 6px 18px rgba(11,92,255,0.12)}
     .btn-muted{background:#fff;color:#111;border:1px solid var(--border)}
     .btn-ghost{background:transparent;border:1px dashed var(--border)}
+    .btn-teal{background:#0d9488;color:#fff;box-shadow:0 6px 18px rgba(13,148,136,0.15)}
+    .btn-indigo{background:#4f46e5;color:#fff;box-shadow:0 6px 18px rgba(79,70,229,0.15)}
+    .btn-amber{background:#fff;color:#92400e;border:1px solid #fcd34d;background-color:#fffbeb}
+    .btn-slate{background:#fff;color:#334155;border:1px solid #cbd5e1}
+    .btn-rose{background:transparent;border:1px dashed #fca5a5;color:#b91c1c}
+    .btn-green{background:#fff;color:#15803d;border:1px solid #86efac;background-color:#f0fdf4}
+    .btn-violet{background:#fff;color:#6d28d9;border:1px solid #ddd6fe;background-color:#f5f3ff}
     .addBtn{background:var(--primary);color:#fff}
     .danger-btn{background:var(--danger);color:#fff;padding:8px 10px;border-radius:8px;border:0;cursor:pointer}
     .small{font-size:13px;color:var(--muted)}
@@ -333,13 +340,13 @@
       <div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:10px">
         <div class="small">Theme: Stylish clinic • Save as <strong>referral_opd_v9.html</strong></div>
         <div class="controls no-print">
-          <button id="saveRx" class="btn btn-muted">Save Rx</button>
-          <button id="viewSaved" class="btn btn-muted">Saved Patients</button>
-          <button id="printRx" class="btn btn-muted">Print Rx Only</button>
+          <button id="saveRx" class="btn btn-teal">Save Rx</button>
+          <button id="viewSaved" class="btn btn-indigo">Saved Patients</button>
+          <button id="printRx" class="btn btn-slate">Print Rx Only</button>
           <button id="printBtn" class="btn btn-primary">Print Full</button>
-          <button id="clearBtn" class="btn btn-ghost">Clear All</button>
-	  <button id="exportJSON" class="btn btn-muted">Export Backup</button>
-	  <button id="importJSON" class="btn btn-muted">Import Backup</button>
+          <button id="clearBtn" class="btn btn-rose">Clear All</button>
+	  <button id="exportJSON" class="btn btn-green">Export Backup</button>
+	  <button id="importJSON" class="btn btn-violet">Import Backup</button>
 	  <input type="file" id="jsonFile" accept=".json" style="display:none">
 
         </div>
