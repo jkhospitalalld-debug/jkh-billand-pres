@@ -196,6 +196,14 @@
           <label>SEX</label>
           <select id="sex"><option>M</option><option>F</option><option>Other</option></select>
         </div>
+        <div style="width:190px">
+          <label>CATEGORY</label>
+          <select id="category">
+            <option value="CGHS-P">CGHS – Pensioner (Cashless)</option>
+            <option value="CGHS-S">CGHS – Serving (Paid)</option>
+            <option value="PVT-JK">Private (JK)</option>
+          </select>
+        </div>
         <div style="min-width:200px;flex:0.9">
           <label>PMH (Past Medical History)</label>
           <input id="pmh" type="text" placeholder="e.g. NA or HTN, DM etc." />
@@ -588,6 +596,7 @@ const KEY_VISITS = 'ref_visits_v9';
 /* ------------- DOM ------------- */
 const uhidEl=document.getElementById('uhid'), dateEl=document.getElementById('date'), billEl=document.getElementById('billno'),
 nameEl=document.getElementById('name'), ageEl=document.getElementById('age'), sexEl=document.getElementById('sex'), pmhEl=document.getElementById('pmh');
+const categoryEl = document.getElementById('category');
 const ccEl = document.getElementById('cc');
 const procCode=document.getElementById('proc_code'), procName=document.getElementById('proc_name'), procQty=document.getElementById('proc_qty'),
 addProc=document.getElementById('addProc'), procBody=document.getElementById('proc_body'), procSearch=document.getElementById('proc_search');
@@ -686,6 +695,8 @@ async function init(){
   ageEl.value=form.age||'';
 
   sexEl.value=form.sex||'M';
+
+  categoryEl.value=form.category||'CGHS-P';
 
   pmhEl.value=form.pmh||'';
 
@@ -1329,7 +1340,13 @@ addVisitBtn.addEventListener('click', () => {
 
 /* ------------- Print handlers ------------- */
 printBtn.addEventListener('click', ()=>{ saveAll(); window.print(); });
-printRxBtn.addEventListener('click', ()=>{ saveAll(); const rxHtml=buildRxHtml(); const w=window.open('','_blank','width=700,height=900'); w.document.open(); w.document.write(rxHtml); w.document.close(); w.focus(); setTimeout(()=>w.print(),500); });
+printRxBtn.addEventListener('click', async ()=>{
+  saveAll();
+  let xrays = [];
+  try { xrays = await apiFetch('/api/xrays/' + encodeURIComponent(uhidEl.value)); } catch(e) { console.warn('Could not load X-Rays for Rx print:', e.message); }
+  const rxHtml=buildRxHtml(xrays);
+  const w=window.open('','_blank','width=700,height=900'); w.document.open(); w.document.write(rxHtml); w.document.close(); w.focus(); setTimeout(()=>w.print(),500);
+});
 
 /* ------------- New Patient & Clear ------------- */
 newPatientBtn.addEventListener('click', ()=>{
@@ -1341,7 +1358,7 @@ form={};
   localStorage.removeItem(KEY_ITEMS);
 localStorage.removeItem(KEY_MED);
 localStorage.removeItem(KEY_VISITS);
-  nameEl.value=''; ageEl.value=''; sexEl.value='M'; pmhEl.value=''; billEl.value='';
+  nameEl.value=''; ageEl.value=''; sexEl.value='M'; categoryEl.value='CGHS-P'; pmhEl.value=''; billEl.value='';
   dateEl.value = new Date().toISOString().slice(0,10);
   updateUHID(); renderItems();
 renderMeds();
@@ -1359,7 +1376,7 @@ localStorage.removeItem(KEY_VISITS);
 meds=[];
 visits=[];
 form={};
-  nameEl.value=''; ageEl.value=''; sexEl.value='M'; pmhEl.value=''; billEl.value='';
+  nameEl.value=''; ageEl.value=''; sexEl.value='M'; categoryEl.value='CGHS-P'; pmhEl.value=''; billEl.value='';
   dateEl.value = new Date().toISOString().slice(0,10);
   updateUHID(); renderItems();
 renderMeds();
@@ -1367,7 +1384,7 @@ renderVisits();
 });
 
 /* ------------- Save Patient as PDF (Clean Version) ------------- */
-savePatientBtn.addEventListener('click', ()=>{
+savePatientBtn.addEventListener('click', async ()=>{
 
   saveAll();
 
@@ -1380,8 +1397,11 @@ savePatientBtn.addEventListener('click', ()=>{
 
   const fileName = `${safeName}_${safeUHID}_${dt}.pdf`;
 
+  let xrays = [];
+  try { xrays = await apiFetch('/api/xrays/' + encodeURIComponent(uhidEl.value)); } catch(e) { console.warn('Could not load X-Rays for PDF:', e.message); }
+
   // Generate same Rx HTML as Print Rx
-  const rxHtml = buildRxHtml();
+  const rxHtml = buildRxHtml(xrays);
 
   // Temporary container
   const container = document.createElement("div");
@@ -1451,19 +1471,26 @@ saveRxBtn.addEventListener('click', () => {
 function saveItems(){ localStorage.setItem(KEY_ITEMS,JSON.stringify(items)); }
 function saveMeds(){ localStorage.setItem(KEY_MED,JSON.stringify(meds)); }
 function saveForm(){ localStorage.setItem(KEY_FORM,JSON.stringify(form)); }
-function saveAll(){ form.name=nameEl.value; form.age=ageEl.value; form.sex=sexEl.value; form.pmh=pmhEl.value; form.cc = ccEl.value; form.date=dateEl.value; form.billno=billEl.value; form.uhid=uhidEl.value; saveForm();
+function saveAll(){ form.name=nameEl.value; form.age=ageEl.value; form.sex=sexEl.value; form.category=categoryEl.value; form.pmh=pmhEl.value; form.cc = ccEl.value; form.date=dateEl.value; form.billno=billEl.value; form.uhid=uhidEl.value; saveForm();
 saveItems();
 saveMeds();
 saveVisits(); }
 
 window.addEventListener('beforeunload', saveAll);
-[nameEl,ageEl,sexEl,pmhEl,dateEl].forEach(el=>el.addEventListener('input', ()=>{ saveAll(); if(el===dateEl) updateUHID(); }));
+[nameEl,ageEl,sexEl,categoryEl,pmhEl,dateEl].forEach(el=>el.addEventListener('input', ()=>{ saveAll(); if(el===dateEl) updateUHID(); }));
 
 /* ------------- utilities & printable builder ------------- */
 function loadJSON(k){ try{return JSON.parse(localStorage.getItem(k));}catch(e){return null} }
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-function buildRxHtml() {
+const CATEGORY_LABELS = {
+  'CGHS-P': 'CGHS – Pensioner (Cashless)',
+  'CGHS-S': 'CGHS – Serving (Paid)',
+  'PVT-JK': 'Private (JK)'
+};
+
+function buildRxHtml(xrays) {
+  xrays = xrays || [];
   const base = {
   clinicName: document.querySelector('.clinic h1').innerText,
   clinicAddr: document.querySelector('.clinic p').innerHTML,
@@ -1472,6 +1499,7 @@ function buildRxHtml() {
   name: nameEl.value,
   age: ageEl.value,
   sex: sexEl.value,
+  category: CATEGORY_LABELS[categoryEl.value] || categoryEl.value,
   pmh: pmhEl.value,
   cc: ccEl.value,
   meds: meds,
@@ -1613,7 +1641,8 @@ ${esc(v.next)}
 
 <div><strong>Patient:</strong> ${esc(base.name)}
      &nbsp; <strong>Age:</strong> ${esc(base.age)}
-     &nbsp; <strong>Sex:</strong> ${esc(base.sex)}</div>
+     &nbsp; <strong>Sex:</strong> ${esc(base.sex)}
+     &nbsp; <strong>Category:</strong> ${esc(base.category)}</div>
 
 <div style="margin-top:8px">
   <strong>PMH:</strong> ${esc(base.pmh || '---')}
@@ -1693,6 +1722,13 @@ No Visit History
 </tbody>
 
 </table>
+
+${xrays.length ? `
+<h3 style="margin-top:18px">X-Ray Images</h3>
+<div style="display:flex;flex-wrap:wrap;gap:8px">
+  ${xrays.map(x => `<img src="${x.data}" style="width:150px;height:150px;object-fit:cover;border:1px solid #ccc;border-radius:6px">`).join('')}
+</div>
+` : ''}
 
 <div class="footer">
   Signature: ____________________ &nbsp;&nbsp; SIGN & STAMP
@@ -1840,6 +1876,7 @@ visits = data.visits ? [...data.visits] : [];
   nameEl.value = form.name;
   ageEl.value = form.age;
   sexEl.value = form.sex;
+  categoryEl.value = form.category || 'CGHS-P';
   pmhEl.value = form.pmh;
   dateEl.value = form.date;
   billEl.value = form.billno || '';
