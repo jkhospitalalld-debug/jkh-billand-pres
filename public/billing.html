@@ -247,7 +247,7 @@ tbody tr:hover{background:var(--paper);}
         <h1>J. K. Hospital Dental Care Center</h1>
         <p>38/53 D Bai Ka Bagh, Prayagraj<br>
         jkhospitalalld@gmail.com &nbsp;·&nbsp; 9450595694<br>
-        CMO Reg: RMEE2119490 &nbsp;·&nbsp; NABH: 188/2023/1613 &nbsp;·&nbsp; AERB: 23-LOEE-885681</p>
+        CMO Reg: 3351/3881 &nbsp;·&nbsp; NABH: 188/2023/1613 &nbsp;·&nbsp; AERB: 23-LOEE-885681</p>
       </div>
       <div class="billmeta">
         <div class="no" id="billNoDisplay">—</div>
@@ -972,15 +972,10 @@ function bumpUnbacked(){
 }
 function updateBackupUI(){
   const last=localStorage.getItem(K_LASTBACKUP);
-  const unbacked=parseInt(localStorage.getItem(K_UNBACKED)||'0');
   $('lastBackupText').textContent = last ? `Last backup: ${new Date(last).toLocaleString()}` : 'No backup taken yet';
-  const daysSince = last ? (Date.now()-new Date(last).getTime())/86400000 : 999;
-  if((unbacked>=5 || daysSince>=3) && !backupBannerDismissed){
-    $('backupMsg').textContent = last
-      ? `${unbacked} bill(s) saved since your last backup.`
-      : `You have unbacked-up bills. Your Save is stored only in this browser.`;
-    $('backupBanner').style.display='flex';
-  }
+  // Note: the old "X bills saved since your last backup" nag banner was removed -
+  // it was written back when bills only lived in browser localStorage. Bills now
+  // save to the server (D1) on every edit, so that warning was no longer accurate.
 }
 function dismissBanner(){ $('backupBanner').style.display='none'; backupBannerDismissed=true; }
 
