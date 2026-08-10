@@ -2219,10 +2219,16 @@ exportJSONBtn.addEventListener('click', async () => {
   } catch (e) {
     console.warn('Could not fetch bills for backup (patients will still be backed up):', e.message);
   }
-  try {
-    xrays = await apiFetch('/api/xrays');
-  } catch (e) {
-    console.warn('Could not fetch X-Rays for backup (patients/bills will still be backed up):', e.message);
+  // Fetch X-rays per patient (many small requests) rather than one big bulk
+  // request - with many patients, a single huge request can hit size/timeout
+  // limits and silently fail, leaving X-rays out of the backup entirely.
+  for (const p of registry) {
+    try {
+      const list = await apiFetch('/api/xrays/' + encodeURIComponent(p.id));
+      xrays.push(...list);
+    } catch (e) {
+      console.warn('Could not fetch X-Rays for', p.id, e.message);
+    }
   }
 
   const dataObj = { patients: registry, bills, billsTrash, xrays, exportedAt: new Date().toISOString() };
@@ -2260,11 +2266,13 @@ document.getElementById('exportSelectedJSON').addEventListener('click', async ()
   } catch (e) {
     console.warn('Could not fetch bills for selected export (patients will still export):', e.message);
   }
-  try {
-    const allXrays = await apiFetch('/api/xrays');
-    xrays = allXrays.filter(x => selectedSet.has(x.uhid));
-  } catch (e) {
-    console.warn('Could not fetch X-Rays for selected export (patients will still export):', e.message);
+  for (const uhid of selectedUhids) {
+    try {
+      const list = await apiFetch('/api/xrays/' + encodeURIComponent(uhid));
+      xrays.push(...list);
+    } catch (e) {
+      console.warn('Could not fetch X-Rays for', uhid, e.message);
+    }
   }
 
   const dataObj = { patients: selectedPatients, bills, billsTrash, xrays, exportedAt: new Date().toISOString() };
