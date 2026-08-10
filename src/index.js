@@ -58,6 +58,15 @@ app.delete('/api/medicines/:id', async (c) => {
    X-RAY IMAGES (per patient, stored as base64 in D1)
    ========================================================= */
 
+// All X-rays across all patients - used by Export Backup / Export Selected
+// so X-ray images travel with the JSON backup, not just patients + bills.
+app.get('/api/xrays', async (c) => {
+  const { results } = await c.env.DB
+    .prepare('SELECT id, uhid, filename, data, uploaded_at FROM xray_images ORDER BY uploaded_at')
+    .all();
+  return c.json(results);
+});
+
 app.get('/api/xrays/:uhid', async (c) => {
   const { results } = await c.env.DB
     .prepare('SELECT id, uhid, filename, data, uploaded_at FROM xray_images WHERE uhid = ? ORDER BY uploaded_at')
@@ -197,6 +206,22 @@ app.post('/api/bills', async (c) => {
      ON CONFLICT(no) DO UPDATE SET name=excluded.name, date=excluded.date, data=excluded.data, deleted=0, updated_at=excluded.updated_at`
   ).bind(bill.no, bill.name || '', bill.date || '', JSON.stringify(bill), now).run();
   return c.json({ ok: true, no: bill.no, updated_at: now });
+});
+
+// Safe auto-create: used only to make sure a bill row exists for a UHID.
+// Unlike POST /api/bills (which is a real upsert used for genuine edits),
+// this NEVER overwrites an existing bill - if a bill with this number
+// already exists (for any reason, including a stale/incorrect "no bill
+// found" check on the client), it's left completely untouched.
+app.post('/api/bills/ensure', async (c) => {
+  const bill = await c.req.json();
+  if (!bill.no) return c.json({ error: 'Missing bill no' }, 400);
+  const now = new Date().toISOString();
+  await c.env.DB.prepare(
+    `INSERT INTO bills (no, name, date, data, deleted, updated_at) VALUES (?,?,?,?,0,?)
+     ON CONFLICT(no) DO NOTHING`
+  ).bind(bill.no, bill.name || '', bill.date || '', JSON.stringify(bill), now).run();
+  return c.json({ ok: true, no: bill.no });
 });
 
 // Soft delete (move to trash) / restore
