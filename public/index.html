@@ -2212,6 +2212,10 @@ exportJSONBtn.addEventListener('click', async () => {
     return;
   }
 
+  const origText = exportJSONBtn.textContent;
+  exportJSONBtn.textContent = 'Exporting…';
+  exportJSONBtn.disabled = true;
+
   let bills = [], billsTrash = [], xrays = [];
   try {
     bills = await apiFetch('/api/bills');
@@ -2219,16 +2223,12 @@ exportJSONBtn.addEventListener('click', async () => {
   } catch (e) {
     console.warn('Could not fetch bills for backup (patients will still be backed up):', e.message);
   }
-  // Fetch X-rays per patient (many small requests) rather than one big bulk
-  // request - with many patients, a single huge request can hit size/timeout
-  // limits and silently fail, leaving X-rays out of the backup entirely.
-  for (const p of registry) {
-    try {
-      const list = await apiFetch('/api/xrays/' + encodeURIComponent(p.id));
-      xrays.push(...list);
-    } catch (e) {
-      console.warn('Could not fetch X-Rays for', p.id, e.message);
-    }
+  // Fetch all X-rays in one request - much faster than one request per
+  // patient (which made this crawl to a halt with hundreds of patients).
+  try {
+    xrays = await apiFetch('/api/xrays');
+  } catch (e) {
+    console.warn('Could not fetch X-Rays for backup (patients/bills will still be backed up):', e.message);
   }
 
   const dataObj = { patients: registry, bills, billsTrash, xrays, exportedAt: new Date().toISOString() };
@@ -2245,6 +2245,8 @@ exportJSONBtn.addEventListener('click', async () => {
   a.click();
 
   URL.revokeObjectURL(url);
+  exportJSONBtn.textContent = origText;
+  exportJSONBtn.disabled = false;
 });
 
 document.getElementById('exportSelectedJSON').addEventListener('click', async () => {
@@ -2253,6 +2255,11 @@ document.getElementById('exportSelectedJSON').addEventListener('click', async ()
     alert('Pehle kam se kam ek patient select karein (checkbox se).');
     return;
   }
+
+  const exportSelBtn = document.getElementById('exportSelectedJSON');
+  const origSelText = exportSelBtn.textContent;
+  exportSelBtn.textContent = 'Exporting…';
+  exportSelBtn.disabled = true;
 
   const selectedPatients = registry.filter(p => selectedUhids.includes(p.id));
   const selectedSet = new Set(selectedUhids);
@@ -2266,13 +2273,11 @@ document.getElementById('exportSelectedJSON').addEventListener('click', async ()
   } catch (e) {
     console.warn('Could not fetch bills for selected export (patients will still export):', e.message);
   }
-  for (const uhid of selectedUhids) {
-    try {
-      const list = await apiFetch('/api/xrays/' + encodeURIComponent(uhid));
-      xrays.push(...list);
-    } catch (e) {
-      console.warn('Could not fetch X-Rays for', uhid, e.message);
-    }
+  try {
+    const allXrays = await apiFetch('/api/xrays');
+    xrays = allXrays.filter(x => selectedSet.has(x.uhid));
+  } catch (e) {
+    console.warn('Could not fetch X-Rays for selected export (patients will still export):', e.message);
   }
 
   const dataObj = { patients: selectedPatients, bills, billsTrash, xrays, exportedAt: new Date().toISOString() };
@@ -2285,6 +2290,8 @@ document.getElementById('exportSelectedJSON').addEventListener('click', async ()
   a.download = `JKH_Selected_${selectedUhids.length}patients_${new Date().toISOString().slice(0,10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
+  exportSelBtn.textContent = origSelText;
+  exportSelBtn.disabled = false;
 });
 
 
