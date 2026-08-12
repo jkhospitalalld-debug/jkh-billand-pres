@@ -591,6 +591,7 @@
       <button onclick="newBill()">＋ New bill</button>
       <button class="primary" onclick="saveBill(true)">Save</button>
       <button class="primary" onclick="savePDFCurrent()">⤓ Save PDF</button>
+      <button class="primary" onclick="printBillCurrent()">🖨 Print</button>
       <button onclick="openRegister()">Register</button>
       <button onclick="openDailyReport()">📅 Daily Collection</button>
       <button onclick="openProcAdmin()">⚙ Procedures</button>
@@ -1114,37 +1115,13 @@ async function refreshLinkedBill(){
       renderBillChips(uhid, bills);
       return;
     }
-    // No bill exists yet for this patient — auto-generate one now.
-    // Bill number = UHID itself, so there's no separate counter to manage.
-    // Uses /api/bills/ensure (insert-only) so if a bill with this number
-    // already exists for any reason, it is never overwritten.
-    try {
-      await apiFetch('/api/bills/ensure', { method: 'POST', body: {
-        no: uhid,
-        date: dateEl.value || '',
-        name: nameEl.value || '',
-        age: ageEl.value || '',
-        sex: sexEl.value || '',
-        phone: '',
-        patientUHID: uhid,
-        lines: [],
-        total: '0.00',
-        payments: [],
-        updatedAt: new Date().toISOString()
-      }});
-      billEl.value = uhid;
-      // Re-fetch so the chip reflects the real bill (in case one already
-      // existed under this number) rather than assuming it's empty.
-      try {
-        const res2 = await fetch(API_BASE + '/api/bills/by-patient/' + encodeURIComponent(uhid));
-        const bills2 = res2.ok ? await res2.json() : [];
-        renderBillChips(uhid, bills2.length ? bills2 : [{ no: uhid, total: '0.00', payments: [] }]);
-      } catch (e3) {
-        renderBillChips(uhid, [{ no: uhid, total: '0.00', payments: [] }]);
-      }
-    } catch (e2) {
-      console.warn('Could not auto-create bill:', e2.message);
-    }
+    // No bill exists yet for this patient. Bill number = UHID is just shown
+    // here as a display convention - the actual bill row is only created
+    // once there's real data to save (opening the bill and adding something),
+    // not the instant a UHID is generated. This avoids flooding the Register
+    // with empty no-name/₹0 bills for patients who were never actually billed.
+    billEl.value = uhid;
+    chipsEl.innerHTML = '';
   } catch (e) {
     console.warn('Could not check for linked bill:', e.message);
   }
@@ -1668,7 +1645,7 @@ form={};
   localStorage.removeItem(KEY_ITEMS);
 localStorage.removeItem(KEY_MED);
 localStorage.removeItem(KEY_VISITS);
-  nameEl.value=''; ageEl.value=''; sexEl.value='M'; categoryEl.value='CGHS-P'; pmhEl.value=''; billEl.value='';
+  nameEl.value=''; ageEl.value=''; sexEl.value='M'; categoryEl.value='CGHS-P'; pmhEl.value=''; ccEl.value=''; billEl.value='';
   dateEl.value = new Date().toISOString().slice(0,10);
   updateUHID(); renderItems();
 renderMeds();
@@ -1686,7 +1663,7 @@ localStorage.removeItem(KEY_VISITS);
 meds=[];
 visits=[];
 form={};
-  nameEl.value=''; ageEl.value=''; sexEl.value='M'; categoryEl.value='CGHS-P'; pmhEl.value=''; billEl.value='';
+  nameEl.value=''; ageEl.value=''; sexEl.value='M'; categoryEl.value='CGHS-P'; pmhEl.value=''; ccEl.value=''; billEl.value='';
   dateEl.value = new Date().toISOString().slice(0,10);
   updateUHID(); renderItems();
 renderMeds();
@@ -3257,6 +3234,22 @@ function savePDFCurrent(){
     toast('⚠️ PDF generation failed: ' + err.message, true);
   }
 }
+function printBillCurrent(){
+  saveBill(false);
+  try{
+    const bill=collectBill();
+    const bytes=generateBillPDF(bill);
+    const blob=new Blob([bytes],{type:'application/pdf'});
+    const url=URL.createObjectURL(blob);
+    const w=window.open(url,'_blank');
+    if(!w){ toast('⚠️ Popup blocked - allow popups to print.', true); return; }
+    w.addEventListener('load', ()=>{ try{ w.print(); }catch(e){} });
+    setTimeout(()=>URL.revokeObjectURL(url), 30000);
+  }catch(err){
+    console.error('PDF generation failed:', err);
+    toast('⚠️ PDF generation failed: ' + err.message, true);
+  }
+}
 function savePDFFor(no){
   const b=readBills().find(x=>x.no===no);
   if(!b){ toast('Bill not found.',true); return; }
@@ -3310,6 +3303,18 @@ async function openBillSection(exactNo, forceNew) {
   linkedPatientUHID = uhid;
   const fieldParams = new URLSearchParams({ name: nameEl.value || '', age: ageEl.value || '', sex: sexEl.value || '' });
 
+  // Bills often get created before the doctor has finished typing the
+  // patient's name/age/sex into the OPD form. So every time an EXISTING bill
+  // is opened, refresh these 3 fields from whatever the OPD form currently
+  // has - never overwrite phone, that's billing-only.
+  function syncPatientFieldsFromOPD(){
+    let changed = false;
+    if(nameEl.value && $('pName').value !== nameEl.value){ $('pName').value = nameEl.value; changed = true; }
+    if(ageEl.value && $('pAge').value !== ageEl.value){ $('pAge').value = ageEl.value; changed = true; }
+    if(sexEl.value && $('pSex').value !== sexEl.value){ $('pSex').value = sexEl.value; changed = true; }
+    if(changed) scheduleSave();
+  }
+
   if (exactNo) {
     // Opened from a bill chip - load this exact bill, never substitute
     // whichever bill happens to be most recently updated.
@@ -3322,6 +3327,7 @@ async function openBillSection(exactNo, forceNew) {
         if (idx >= 0) local[idx] = exact; else local.push(exact);
         writeBills(local);
         loadBill(exact.no);
+        syncPatientFieldsFromOPD();
         toast(`Opened bill ${exact.no}`);
         return;
       }
@@ -3346,6 +3352,7 @@ async function openBillSection(exactNo, forceNew) {
         if (idx >= 0) local[idx] = existing; else local.push(existing);
         writeBills(local);
         loadBill(existing.no);
+        syncPatientFieldsFromOPD();
         toast(`Opened bill ${existing.no}`);
         return;
       }
