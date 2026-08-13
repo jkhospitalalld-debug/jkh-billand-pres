@@ -361,6 +361,10 @@
             <label class="small">Bill No (linked)</label>
             <input id="billno" type="text" placeholder="No bill yet" readonly style="background:#f1f5f9;cursor:not-allowed" />
           </div>
+          <div class="field">
+            <label class="small">Mobile Number</label>
+            <input id="mobile" type="tel" inputmode="numeric" maxlength="10" placeholder="10-digit mobile" />
+          </div>
         </div>
       </header>
     </div>
@@ -663,13 +667,18 @@
 
     <div class="tablewrap">
       <table>
-        <thead><tr><th>Date</th><th>Amount (₹)</th><th>Note</th><th class="no-print"></th></tr></thead>
+        <thead><tr><th>Date</th><th>Amount (₹)</th><th>Mode</th><th>Note</th><th class="no-print"></th></tr></thead>
         <tbody id="paymentsBody"></tbody>
       </table>
       <div class="addrow-cell no-print" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 0">
         <input type="date" id="payDate" style="padding:8px;border-radius:8px;border:1px solid var(--line)">
         <input type="number" id="payAmount" placeholder="Amount" inputmode="decimal" style="width:120px;padding:8px;border-radius:8px;border:1px solid var(--line)">
-        <input type="text" id="payNote" placeholder="Note (e.g. cash / UPI)" style="width:180px;padding:8px;border-radius:8px;border:1px solid var(--line)">
+        <select id="payMode" style="padding:8px;border-radius:8px;border:1px solid var(--line)">
+          <option value="CASH">CASH</option>
+          <option value="UPI">UPI</option>
+          <option value="DISCOUNT">DISCOUNT</option>
+        </select>
+        <input type="text" id="payNote" placeholder="Note (optional)" style="width:180px;padding:8px;border-radius:8px;border:1px solid var(--line)">
         <button class="addrow" onclick="addPayment()">＋ Add payment</button>
       </div>
     </div>
@@ -725,7 +734,7 @@
     </div>
     <div class="modal-body">
       <div style="padding:14px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:13px;color:var(--ink-soft)">Total payments received on this date</span>
+        <span style="font-size:13px;color:var(--ink-soft)">Total cash/UPI received on this date (discounts excluded)</span>
         <span style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:700;color:var(--teal-dark)">₹<span id="dailyTotal">0.00</span></span>
       </div>
       <div id="dailyBody"></div>
@@ -898,6 +907,7 @@ const KEY_VISITS = 'ref_visits_v9';
 const uhidEl=document.getElementById('uhid'), dateEl=document.getElementById('date'), billEl=document.getElementById('billno'),
 nameEl=document.getElementById('name'), ageEl=document.getElementById('age'), sexEl=document.getElementById('sex'), pmhEl=document.getElementById('pmh');
 const categoryEl = document.getElementById('category');
+const mobileEl = document.getElementById('mobile');
 const ccEl = document.getElementById('cc');
 const procCode=document.getElementById('proc_code'), procName=document.getElementById('proc_name'), procQty=document.getElementById('proc_qty'),
 addProc=document.getElementById('addProc'), procBody=document.getElementById('proc_body'), procSearch=document.getElementById('proc_search');
@@ -998,6 +1008,7 @@ async function init(){
   sexEl.value=form.sex||'M';
 
   categoryEl.value=form.category||'CGHS-P';
+  mobileEl.value=form.mobile||'';
 
   pmhEl.value=form.pmh||'';
 
@@ -1645,7 +1656,7 @@ form={};
   localStorage.removeItem(KEY_ITEMS);
 localStorage.removeItem(KEY_MED);
 localStorage.removeItem(KEY_VISITS);
-  nameEl.value=''; ageEl.value=''; sexEl.value='M'; categoryEl.value='CGHS-P'; pmhEl.value=''; ccEl.value=''; billEl.value='';
+  nameEl.value=''; ageEl.value=''; sexEl.value='M'; categoryEl.value='CGHS-P'; mobileEl.value=''; pmhEl.value=''; ccEl.value=''; billEl.value='';
   dateEl.value = new Date().toISOString().slice(0,10);
   updateUHID(); renderItems();
 renderMeds();
@@ -1663,7 +1674,7 @@ localStorage.removeItem(KEY_VISITS);
 meds=[];
 visits=[];
 form={};
-  nameEl.value=''; ageEl.value=''; sexEl.value='M'; categoryEl.value='CGHS-P'; pmhEl.value=''; ccEl.value=''; billEl.value='';
+  nameEl.value=''; ageEl.value=''; sexEl.value='M'; categoryEl.value='CGHS-P'; mobileEl.value=''; pmhEl.value=''; ccEl.value=''; billEl.value='';
   dateEl.value = new Date().toISOString().slice(0,10);
   updateUHID(); renderItems();
 renderMeds();
@@ -1758,13 +1769,13 @@ saveRxBtn.addEventListener('click', () => {
 function saveItems(){ localStorage.setItem(KEY_ITEMS,JSON.stringify(items)); }
 function saveMeds(){ localStorage.setItem(KEY_MED,JSON.stringify(meds)); }
 function saveForm(){ localStorage.setItem(KEY_FORM,JSON.stringify(form)); }
-function saveAll(){ form.name=nameEl.value; form.age=ageEl.value; form.sex=sexEl.value; form.category=categoryEl.value; form.pmh=pmhEl.value; form.cc = ccEl.value; form.date=dateEl.value; form.billno=billEl.value; form.uhid=uhidEl.value; saveForm();
+function saveAll(){ form.name=nameEl.value; form.age=ageEl.value; form.sex=sexEl.value; form.category=categoryEl.value; form.mobile=mobileEl.value; form.pmh=pmhEl.value; form.cc = ccEl.value; form.date=dateEl.value; form.billno=billEl.value; form.uhid=uhidEl.value; saveForm();
 saveItems();
 saveMeds();
 saveVisits(); }
 
 window.addEventListener('beforeunload', saveAll);
-[nameEl,ageEl,sexEl,categoryEl,pmhEl,dateEl].forEach(el=>el.addEventListener('input', ()=>{ saveAll(); if(el===dateEl) updateUHID(); }));
+[nameEl,ageEl,sexEl,categoryEl,mobileEl,pmhEl,dateEl].forEach(el=>el.addEventListener('input', ()=>{ saveAll(); if(el===dateEl) updateUHID(); }));
 
 /* ------------- utilities & printable builder ------------- */
 function loadJSON(k){ try{return JSON.parse(localStorage.getItem(k));}catch(e){return null} }
@@ -2164,6 +2175,7 @@ visits = data.visits ? [...data.visits] : [];
   ageEl.value = form.age;
   sexEl.value = form.sex;
   categoryEl.value = form.category || 'CGHS-P';
+  mobileEl.value = form.mobile || '';
   pmhEl.value = form.pmh;
   dateEl.value = form.date;
   billEl.value = form.billno || '';
@@ -2578,12 +2590,13 @@ function addPayment(){
   const amt=parseFloat($('payAmount').value);
   if(!amt || amt<=0){ toast('Enter a valid payment amount.',true); return; }
   const date=$('payDate').value || new Date().toISOString().slice(0,10);
+  const mode=$('payMode').value || 'CASH';
   const note=$('payNote').value.trim();
-  payments.push({date, amount:amt, note, addedAt:new Date().toISOString()});
-  $('payAmount').value=''; $('payNote').value=''; $('payDate').value='';
+  payments.push({date, amount:amt, mode, note, addedAt:new Date().toISOString()});
+  $('payAmount').value=''; $('payNote').value=''; $('payDate').value=''; $('payMode').value='CASH';
   renderPayments();
   scheduleSave();
-  toast(`₹${amt.toFixed(2)} payment added — saving automatically.`);
+  toast(`₹${amt.toFixed(2)} (${mode}) added — saving automatically.`);
 }
 function removePayment(idx){
   payments.splice(idx,1);
@@ -2597,9 +2610,10 @@ function renderPayments(){
     <tr>
       <td>${p.date||''}${p.addedAt ? '<div style="font-size:12px;font-weight:600;color:var(--ink)">'+new Date(p.addedAt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})+'</div>' : ''}</td>
       <td>₹${(parseFloat(p.amount)||0).toFixed(2)}</td>
+      <td>${p.mode==='DISCOUNT' ? '<span style="color:#b45309;font-weight:700">DISCOUNT</span>' : (p.mode||'CASH')}</td>
       <td>${p.note||''}</td>
       <td class="no-print"><button class="rowdel" title="Remove payment" onclick="removePayment(${i})">✕</button></td>
-    </tr>`).join('') : `<tr><td colspan="4" style="text-align:center;color:var(--ink-soft);padding:10px">No payments recorded yet.</td></tr>`;
+    </tr>`).join('') : `<tr><td colspan="5" style="text-align:center;color:var(--ink-soft);padding:10px">No payments recorded yet.</td></tr>`;
 
   const grand=parseFloat(($('grand').textContent||'0').replace(/,/g,''))||0;
   const paid=payments.reduce((s,p)=>s+(parseFloat(p.amount)||0),0);
@@ -2652,7 +2666,7 @@ function startFreshBillWithNo(no, params){
   $('pName').value=(params && params.get('name')) || '';
   $('pAge').value=(params && params.get('age')) || '';
   $('pSex').value=(params && params.get('sex')) || 'M';
-  $('pPhone').value='';
+  $('pPhone').value=(params && params.get('phone')) || '';
   rows=[]; rowSeq=0;
   payments=[];
   addRow();
@@ -3301,7 +3315,7 @@ async function openBillSection(exactNo, forceNew) {
   document.getElementById('billSection').style.display = 'block';
   document.body.style.overflow = 'hidden';
   linkedPatientUHID = uhid;
-  const fieldParams = new URLSearchParams({ name: nameEl.value || '', age: ageEl.value || '', sex: sexEl.value || '' });
+  const fieldParams = new URLSearchParams({ name: nameEl.value || '', age: ageEl.value || '', sex: sexEl.value || '', phone: mobileEl.value || '' });
 
   // Bills often get created before the doctor has finished typing the
   // patient's name/age/sex into the OPD form. So every time an EXISTING bill
@@ -3312,6 +3326,7 @@ async function openBillSection(exactNo, forceNew) {
     if(nameEl.value && $('pName').value !== nameEl.value){ $('pName').value = nameEl.value; changed = true; }
     if(ageEl.value && $('pAge').value !== ageEl.value){ $('pAge').value = ageEl.value; changed = true; }
     if(sexEl.value && $('pSex').value !== sexEl.value){ $('pSex').value = sexEl.value; changed = true; }
+    if(mobileEl.value && $('pPhone').value !== mobileEl.value){ $('pPhone').value = mobileEl.value; changed = true; }
     if(changed) scheduleSave();
   }
 
@@ -3401,10 +3416,11 @@ async function renderDailyReport(){
   const rows = [];
   bills.forEach(b => {
     (b.payments||[]).forEach(p => {
-      if (p.date === date) rows.push({ billNo: b.no, name: b.name || b.pName || '', amount: parseFloat(p.amount)||0, note: p.note||'' });
+      if (p.date === date) rows.push({ billNo: b.no, name: b.name || b.pName || '', amount: parseFloat(p.amount)||0, mode: p.mode || 'CASH', note: p.note||'' });
     });
   });
-  const total = rows.reduce((s,r)=>s+r.amount, 0);
+  // Discount entries reduce what's owed but aren't real income - excluded from the total.
+  const total = rows.filter(r => r.mode !== 'DISCOUNT').reduce((s,r)=>s+r.amount, 0);
   $('dailyTotal').textContent = total.toFixed(2);
   if(!rows.length){
     body.innerHTML = '<div class="empty">No payments recorded for this date.</div>';
@@ -3413,8 +3429,8 @@ async function renderDailyReport(){
   body.innerHTML = rows.map(r => `
     <div class="regrow">
       <span class="rno">${esc(r.billNo)}</span>
-      <span class="rname">${esc(r.name)}${r.note ? `<small>${esc(r.note)}</small>` : ''}</span>
-      <span class="ramt">₹${r.amount.toFixed(2)}</span>
+      <span class="rname">${esc(r.name)} <small style="color:${r.mode==='DISCOUNT'?'#b45309':'inherit'};font-weight:700">${esc(r.mode)}</small>${r.note ? `<small>${esc(r.note)}</small>` : ''}</span>
+      <span class="ramt"${r.mode==='DISCOUNT' ? ' style="color:#b45309"' : ''}>₹${r.amount.toFixed(2)}</span>
     </div>`).join('');
 }
 
