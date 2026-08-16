@@ -446,7 +446,7 @@
           <div class="controls no-print">
             <button id="manageMedsBtn" class="btn btn-muted" type="button">⚙ Medicines</button>
             <button id="savePatient" class="btn btn-primary">Save Patient</button>
-<button id="shareUhid" type="button" class="btn btn-indigo">📤 Share UHID</button>
+            <button id="shareUhid" class="btn btn-primary" type="button">📤 Share UHID</button>
             <button id="newPatient" class="btn btn-muted">New Patient</button>
           </div>
         </div>
@@ -3434,16 +3434,14 @@ async function renderDailyReport(){
     </div>`).join('');
 }
 
-</script>
+
 
 /* ------------- Share UHID via WhatsApp ------------- */
-(() => {
-  const shareUhidBtn = document.getElementById('shareUhid');
-  if (!shareUhidBtn) return;
-
+const shareUhidBtn = document.getElementById('shareUhid');
+if (shareUhidBtn) {
   shareUhidBtn.addEventListener('click', () => {
-    const uhid = String((typeof uhidEl !== 'undefined' && uhidEl) ? uhidEl.value : '').trim();
-    const mobile = String((typeof mobileEl !== 'undefined' && mobileEl) ? mobileEl.value : '').replace(/\D/g, '');
+    const uhid = String(uhidEl.value || '').trim();
+    const mobile = String(mobileEl.value || '').replace(/\D/g, '');
 
     if (!uhid) {
       alert('Please wait for the UHID to be ready.');
@@ -3452,14 +3450,13 @@ async function renderDailyReport(){
 
     if (!/^[6-9]\d{9}$/.test(mobile)) {
       alert('Please enter a valid 10-digit patient mobile number.');
-      if (typeof mobileEl !== 'undefined' && mobileEl) mobileEl.focus();
+      mobileEl.focus();
       return;
     }
 
     const portalUrl = 'https://jkh-dental-website.jkhospitalalld.workers.dev/patient-portal';
 
-    const message =
-`J. K. Hospital Dental Care Center
+    const message = `J. K. Hospital Dental Care Center
 
 Dear Patient,
 
@@ -3474,9 +3471,13 @@ You can access your X-Rays, Prescriptions and Bills from the Patient Portal.
 Thank you.
 J. K. Hospital Dental Care Center`;
 
-    window.open(`https://wa.me/91${mobile}?text=${encodeURIComponent(message)}`, '_blank');
+    window.open(
+      'https://wa.me/91' + mobile + '?text=' + encodeURIComponent(message),
+      '_blank'
+    );
   });
-})();
+}
 
+</script>
 </body>
 </html>
