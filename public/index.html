@@ -3454,15 +3454,13 @@ if (shareUhidBtn) {
       return;
     }
 
-    const portalUrl = 'https://jkh-dental-website.jkhospitalalld.workers.dev/patient-portal';
+    const portalUrl = 'https://jkh-dental-website.jkhospitalalld.workers.dev/patient-portal?uhid=' + encodeURIComponent(uhid);
 
     const message = `J. K. Hospital Dental Care Center
 
 Dear Patient,
 
-Your UHID is: \`${uhid}\`
-
-Please use this UHID to login to our Patient Portal using your registered mobile number:
+Tap the link below to open your Patient Portal (your UHID is already filled in - just enter your mobile number):
 
 ${portalUrl}
 
