@@ -538,6 +538,7 @@
         <div class="controls no-print">
           <button id="saveRx" class="btn btn-teal">Save Rx</button>
           <button id="viewSaved" class="btn btn-indigo">Saved Patients</button>
+          <button id="todaySummaryBtn" class="btn btn-indigo">📋 Today's Summary</button>
           <button id="printRx" class="btn btn-slate">Print Rx Only</button>
           <button id="printBtn" class="btn btn-primary">Print Full</button>
           <button id="clearBtn" class="btn btn-rose">Clear All</button>
@@ -786,6 +787,31 @@ style="width:100%;padding:8px;margin-bottom:10px;border:1px solid #ccc;border-ra
       <tbody id="savedBody"></tbody>
     </table>
     
+  </div>
+</div>
+
+<!-- Today's Summary modal -->
+<div id="todaySummaryModal" class="no-print" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;">
+  <div style="background:#fff;padding:15px;border-radius:10px;width:90%;max-width:700px;max-height:80vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <h3 style="margin:0" id="todaySummaryTitle">Today's Summary</h3>
+      <button onclick="document.getElementById('todaySummaryModal').style.display='none'" class="btn btn-muted">✕ Close</button>
+    </div>
+    <div id="todaySummaryCounts" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap"></div>
+    <div>
+      <h4 style="margin:10px 0 6px">🆕 New Patients (<span id="newCount">0</span>)</h4>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr><th style="text-align:left">UHID</th><th style="text-align:left">Name</th></tr></thead>
+        <tbody id="newPatientsBody"></tbody>
+      </table>
+    </div>
+    <div>
+      <h4 style="margin:16px 0 6px">🔁 Old Patients (<span id="oldCount">0</span>)</h4>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr><th style="text-align:left">UHID</th><th style="text-align:left">Name</th></tr></thead>
+        <tbody id="oldPatientsBody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 <script>
@@ -2062,6 +2088,69 @@ viewSaved.addEventListener('click', async () => {
   renderSavedList();
   savedModal.style.display = 'flex';
 });
+
+/* ------------- Today's Summary (New vs Old patients) ------------- */
+const todaySummaryBtn = document.getElementById('todaySummaryBtn');
+const todaySummaryModal = document.getElementById('todaySummaryModal');
+
+todaySummaryBtn.addEventListener('click', async () => {
+  try {
+    const serverPatients = await apiFetch('/api/patients');
+    serverPatients.forEach(sp => {
+      const idx = registry.findIndex(p => p.id === sp.id);
+      if (idx >= 0) registry[idx] = sp; else registry.push(sp);
+    });
+    localStorage.setItem(KEY_REGISTRY, JSON.stringify(registry));
+  } catch (err) {
+    console.warn('Could not fetch server patient list, showing local data:', err.message);
+  }
+  renderTodaySummary();
+  todaySummaryModal.style.display = 'flex';
+});
+
+function renderTodaySummary() {
+  const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const todayKey = todayStr.replace(/-/g, ''); // YYYYMMDD, matches UHID date prefix
+
+  // Patients whose visit/OPD date on the form is today
+  const todaysPatients = registry.filter(p => (p.form?.date || '') === todayStr);
+
+  // New = UHID was first generated today (UHID starts with today's YYYYMMDD).
+  // Old = UHID was generated on an earlier day (returning/follow-up patient).
+  const newPatients = [];
+  const oldPatients = [];
+  todaysPatients.forEach(p => {
+    const uhidPrefix = (p.id || '').slice(0, 8);
+    if (uhidPrefix === todayKey) newPatients.push(p);
+    else oldPatients.push(p);
+  });
+
+  newPatients.sort((a, b) => (a.form?.name || '').localeCompare(b.form?.name || ''));
+  oldPatients.sort((a, b) => (a.form?.name || '').localeCompare(b.form?.name || ''));
+
+  document.getElementById('todaySummaryTitle').textContent =
+    `Today's Summary — ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+
+  document.getElementById('todaySummaryCounts').innerHTML = `
+    <div style="background:#eef2ff;border-radius:8px;padding:10px 16px;font-weight:600">Total Today: ${todaysPatients.length}</div>
+    <div style="background:#ecfdf5;border-radius:8px;padding:10px 16px;font-weight:600">New: ${newPatients.length}</div>
+    <div style="background:#fff7ed;border-radius:8px;padding:10px 16px;font-weight:600">Old: ${oldPatients.length}</div>
+  `;
+
+  document.getElementById('newCount').textContent = newPatients.length;
+  document.getElementById('oldCount').textContent = oldPatients.length;
+
+  const newBody = document.getElementById('newPatientsBody');
+  const oldBody = document.getElementById('oldPatientsBody');
+
+  newBody.innerHTML = newPatients.length
+    ? newPatients.map(p => `<tr><td>${p.id}</td><td>${p.form?.name || ''}</td></tr>`).join('')
+    : '<tr><td colspan="2" style="text-align:center;color:#666">Koi naya patient nahi</td></tr>';
+
+  oldBody.innerHTML = oldPatients.length
+    ? oldPatients.map(p => `<tr><td>${p.id}</td><td>${p.form?.name || ''}</td></tr>`).join('')
+    : '<tr><td colspan="2" style="text-align:center;color:#666">Koi purana patient nahi</td></tr>';
+}
 
 function patientTimestamp(p){
   // Prefer the doctor-entered visit date on the form - it's reliable and
