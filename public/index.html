@@ -2094,6 +2094,7 @@ const todaySummaryBtn = document.getElementById('todaySummaryBtn');
 const todaySummaryModal = document.getElementById('todaySummaryModal');
 
 todaySummaryBtn.addEventListener('click', async () => {
+  let allBillsForSummary = [];
   try {
     const serverPatients = await apiFetch('/api/patients');
     serverPatients.forEach(sp => {
@@ -2104,16 +2105,55 @@ todaySummaryBtn.addEventListener('click', async () => {
   } catch (err) {
     console.warn('Could not fetch server patient list, showing local data:', err.message);
   }
-  renderTodaySummary();
+  try {
+    allBillsForSummary = await apiFetch('/api/bills');
+  } catch (err) {
+    console.warn('Could not fetch bills for summary:', err.message);
+  }
+  renderTodaySummary(allBillsForSummary);
   todaySummaryModal.style.display = 'flex';
 });
 
-function renderTodaySummary() {
+// A record counts as "touched today" if its own date field is today, OR the
+// server saved/updated it today (covers: new visit added, medicine added,
+// any edit) - not just a fresh OPD entry with today's date.
+function isToday(dateStr, todayStr) {
+  if (!dateStr) return false;
+  return String(dateStr).slice(0, 10) === todayStr;
+}
+
+function renderTodaySummary(allBillsForSummary) {
   const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
   const todayKey = todayStr.replace(/-/g, ''); // YYYYMMDD, matches UHID date prefix
 
-  // Patients whose visit/OPD date on the form is today
-  const todaysPatients = registry.filter(p => (p.form?.date || '') === todayStr);
+  // 1) Patients touched today directly: OPD visit date is today, OR the
+  //    patient record itself was saved/updated today (new visit added,
+  //    medicine added, any change) even if the visit-date field wasn't edited.
+  const touchedUHIDs = new Map(); // uhid -> patient object (best available)
+  registry.forEach(p => {
+    const formDateToday = isToday(p.form?.date, todayStr);
+    const savedToday = isToday(p.updated_at || p.updatedAt, todayStr);
+    if (formDateToday || savedToday) touchedUHIDs.set(p.id, p);
+  });
+
+  // 2) Patients touched today via billing: a new bill created today, or an
+  //    existing bill edited today, linked by patientUHID.
+  (allBillsForSummary || []).forEach(b => {
+    const uhid = b.patientUHID;
+    if (!uhid) return;
+    const billDateToday = isToday(b.date, todayStr);
+    const billSavedToday = isToday(b.updated_at || b.updatedAt, todayStr);
+    if (billDateToday || billSavedToday) {
+      if (!touchedUHIDs.has(uhid)) {
+        // Patient record might not be in registry (e.g. bill made without
+        // loading the OPD form) - fall back to name from the bill itself.
+        const existing = registry.find(p => p.id === uhid);
+        touchedUHIDs.set(uhid, existing || { id: uhid, form: { name: b.name || '' } });
+      }
+    }
+  });
+
+  const todaysPatients = Array.from(touchedUHIDs.values());
 
   // New = UHID was first generated today (UHID starts with today's YYYYMMDD).
   // Old = UHID was generated on an earlier day (returning/follow-up patient).
