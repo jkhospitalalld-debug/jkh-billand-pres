@@ -797,6 +797,11 @@ style="width:100%;padding:8px;margin-bottom:10px;border:1px solid #ccc;border-ra
       <h3 style="margin:0" id="todaySummaryTitle">Today's Summary</h3>
       <button onclick="document.getElementById('todaySummaryModal').style.display='none'" class="btn btn-muted">✕ Close</button>
     </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <label for="summaryDatePicker" style="font-weight:600">Date:</label>
+      <input type="date" id="summaryDatePicker" style="padding:5px 8px;border:1px solid #ccc;border-radius:6px">
+      <button id="summaryTodayBtn" class="btn btn-muted" style="padding:4px 10px;font-size:13px">Today</button>
+    </div>
     <div id="todaySummaryCounts" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap"></div>
     <div>
       <h4 style="margin:10px 0 6px">🆕 New Patients (<span id="newCount">0</span>)</h4>
@@ -2092,9 +2097,11 @@ viewSaved.addEventListener('click', async () => {
 /* ------------- Today's Summary (New vs Old patients) ------------- */
 const todaySummaryBtn = document.getElementById('todaySummaryBtn');
 const todaySummaryModal = document.getElementById('todaySummaryModal');
+const summaryDatePicker = document.getElementById('summaryDatePicker');
+const summaryTodayBtn = document.getElementById('summaryTodayBtn');
+let summaryBillsCache = [];
 
 todaySummaryBtn.addEventListener('click', async () => {
-  let allBillsForSummary = [];
   try {
     const serverPatients = await apiFetch('/api/patients');
     serverPatients.forEach(sp => {
@@ -2106,44 +2113,53 @@ todaySummaryBtn.addEventListener('click', async () => {
     console.warn('Could not fetch server patient list, showing local data:', err.message);
   }
   try {
-    allBillsForSummary = await apiFetch('/api/bills');
+    summaryBillsCache = await apiFetch('/api/bills');
   } catch (err) {
     console.warn('Could not fetch bills for summary:', err.message);
   }
-  renderTodaySummary(allBillsForSummary);
+  summaryDatePicker.value = new Date().toISOString().slice(0, 10); // default: today
+  renderTodaySummary(summaryDatePicker.value);
   todaySummaryModal.style.display = 'flex';
 });
 
-// A record counts as "touched today" if its own date field is today, OR the
-// server saved/updated it today (covers: new visit added, medicine added,
-// any edit) - not just a fresh OPD entry with today's date.
-function isToday(dateStr, todayStr) {
+summaryDatePicker.addEventListener('change', () => {
+  if (summaryDatePicker.value) renderTodaySummary(summaryDatePicker.value);
+});
+
+summaryTodayBtn.addEventListener('click', () => {
+  summaryDatePicker.value = new Date().toISOString().slice(0, 10);
+  renderTodaySummary(summaryDatePicker.value);
+});
+
+// A record counts as "on this date" if its own date field matches, OR the
+// server saved/updated it on that date (covers: new visit added, medicine
+// added, any edit) - not just a fresh OPD entry with that date typed in.
+function isOnDate(dateStr, targetDateStr) {
   if (!dateStr) return false;
-  return String(dateStr).slice(0, 10) === todayStr;
+  return String(dateStr).slice(0, 10) === targetDateStr;
 }
 
-function renderTodaySummary(allBillsForSummary) {
-  const todayStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  const todayKey = todayStr.replace(/-/g, ''); // YYYYMMDD, matches UHID date prefix
+function renderTodaySummary(targetDateStr) {
+  const dateKey = targetDateStr.replace(/-/g, ''); // YYYYMMDD, matches UHID date prefix
 
-  // 1) Patients touched today directly: OPD visit date is today, OR the
-  //    patient record itself was saved/updated today (new visit added,
+  // 1) Patients touched on this date directly: OPD visit date matches, OR the
+  //    patient record itself was saved/updated on this date (new visit added,
   //    medicine added, any change) even if the visit-date field wasn't edited.
   const touchedUHIDs = new Map(); // uhid -> patient object (best available)
   registry.forEach(p => {
-    const formDateToday = isToday(p.form?.date, todayStr);
-    const savedToday = isToday(p.updated_at || p.updatedAt, todayStr);
-    if (formDateToday || savedToday) touchedUHIDs.set(p.id, p);
+    const formDateMatch = isOnDate(p.form?.date, targetDateStr);
+    const savedMatch = isOnDate(p.updated_at || p.updatedAt, targetDateStr);
+    if (formDateMatch || savedMatch) touchedUHIDs.set(p.id, p);
   });
 
-  // 2) Patients touched today via billing: a new bill created today, or an
-  //    existing bill edited today, linked by patientUHID.
-  (allBillsForSummary || []).forEach(b => {
+  // 2) Patients touched on this date via billing: a new bill created, or an
+  //    existing bill edited, on this date, linked by patientUHID.
+  (summaryBillsCache || []).forEach(b => {
     const uhid = b.patientUHID;
     if (!uhid) return;
-    const billDateToday = isToday(b.date, todayStr);
-    const billSavedToday = isToday(b.updated_at || b.updatedAt, todayStr);
-    if (billDateToday || billSavedToday) {
+    const billDateMatch = isOnDate(b.date, targetDateStr);
+    const billSavedMatch = isOnDate(b.updated_at || b.updatedAt, targetDateStr);
+    if (billDateMatch || billSavedMatch) {
       if (!touchedUHIDs.has(uhid)) {
         // Patient record might not be in registry (e.g. bill made without
         // loading the OPD form) - fall back to name from the bill itself.
@@ -2153,26 +2169,28 @@ function renderTodaySummary(allBillsForSummary) {
     }
   });
 
-  const todaysPatients = Array.from(touchedUHIDs.values());
+  const dayPatients = Array.from(touchedUHIDs.values());
 
-  // New = UHID was first generated today (UHID starts with today's YYYYMMDD).
+  // New = UHID was first generated on this date (UHID starts with dateKey).
   // Old = UHID was generated on an earlier day (returning/follow-up patient).
   const newPatients = [];
   const oldPatients = [];
-  todaysPatients.forEach(p => {
+  dayPatients.forEach(p => {
     const uhidPrefix = (p.id || '').slice(0, 8);
-    if (uhidPrefix === todayKey) newPatients.push(p);
+    if (uhidPrefix === dateKey) newPatients.push(p);
     else oldPatients.push(p);
   });
 
   newPatients.sort((a, b) => (a.form?.name || '').localeCompare(b.form?.name || ''));
   oldPatients.sort((a, b) => (a.form?.name || '').localeCompare(b.form?.name || ''));
 
-  document.getElementById('todaySummaryTitle').textContent =
-    `Today's Summary — ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+  const [yy, mm, dd] = targetDateStr.split('-');
+  const labelDate = new Date(Number(yy), Number(mm) - 1, Number(dd))
+    .toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  document.getElementById('todaySummaryTitle').textContent = `Summary — ${labelDate}`;
 
   document.getElementById('todaySummaryCounts').innerHTML = `
-    <div style="background:#eef2ff;border-radius:8px;padding:10px 16px;font-weight:600">Total Today: ${todaysPatients.length}</div>
+    <div style="background:#eef2ff;border-radius:8px;padding:10px 16px;font-weight:600">Total: ${dayPatients.length}</div>
     <div style="background:#ecfdf5;border-radius:8px;padding:10px 16px;font-weight:600">New: ${newPatients.length}</div>
     <div style="background:#fff7ed;border-radius:8px;padding:10px 16px;font-weight:600">Old: ${oldPatients.length}</div>
   `;
