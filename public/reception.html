@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Reception Entry - J. K. Hospital Dental Care Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#f1f5f9;
+      --card:#ffffff;
+      --muted:#6b7280;
+      --accent:#0b5cff;
+      --primary:#0ea5a4;
+      --border:#e6e9ef;
+    }
+    *{box-sizing:border-box}
+    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans',Arial;margin:0;padding:18px;background:var(--bg);color:#0f172a}
+    .container{max-width:480px;margin:40px auto}
+    .card{background:var(--card);border-radius:12px;padding:22px;box-shadow:0 8px 28px rgba(11,20,50,0.06);border:1px solid var(--border)}
+    header{display:flex;gap:12px;align-items:center;margin-bottom:18px}
+    .logo{width:52px;height:52px;border-radius:10px;object-fit:cover}
+    h1{margin:0;font-size:18px;color:var(--accent)}
+    p.sub{margin:2px 0 0;font-size:12px;color:var(--muted)}
+    label{font-size:13px;color:var(--muted);margin:14px 0 6px;display:block}
+    input[type="text"],input[type="number"],select{width:100%;padding:11px;border-radius:10px;border:1px solid var(--border);background:#fff;font-size:16px}
+    .btn{margin-top:20px;width:100%;padding:13px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-size:16px;font-weight:600;cursor:pointer}
+    .btn:disabled{opacity:0.6;cursor:not-allowed}
+    .result{margin-top:16px;padding:14px;border-radius:10px;background:#ecfdf5;border:1px solid #10b98155;display:none;text-align:center}
+    .result .uhid{font-size:22px;font-weight:700;color:#065f46;letter-spacing:0.5px}
+    .err{margin-top:12px;padding:10px;border-radius:8px;background:#fef2f2;border:1px solid #ef444455;color:#b91c1c;font-size:13px;display:none}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <header>
+        <img src="LOGO.jpg" class="logo" onerror="this.style.display='none'" />
+        <div>
+          <h1>J. K. Hospital Dental Care Center</h1>
+          <p class="sub">Reception Entry — New Patient Registration</p>
+        </div>
+      </header>
+
+      <form id="recForm">
+        <label for="rName">Patient Name *</label>
+        <input type="text" id="rName" required autocomplete="off" />
+
+        <label for="rAge">Age *</label>
+        <input type="number" id="rAge" min="0" max="130" required />
+
+        <label for="rSex">Sex *</label>
+        <select id="rSex" required>
+          <option value="M">Male</option>
+          <option value="F">Female</option>
+          <option value="O">Other</option>
+        </select>
+
+        <label for="rMobile">Mobile Number *</label>
+        <input type="text" id="rMobile" inputmode="numeric" required autocomplete="off" />
+
+        <button type="submit" class="btn" id="saveBtn">Save Patient</button>
+        <div class="err" id="errBox"></div>
+        <div class="result" id="resultBox">
+          Patient saved ✅<br/>
+          UHID: <span class="uhid" id="resultUhid"></span>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<script>
+const API_BASE = ''; // same-origin, served from this same Worker
+const SYSTEM_ID = "XR"; // keep same as main app so UHID numbering stays shared
+
+async function apiFetch(path, opts = {}) {
+  const res = await fetch(API_BASE + path, {
+    ...opts,
+    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    body: opts.body ? JSON.stringify(opts.body) : undefined
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+async function genUHID(dateVal) {
+  const params = new URLSearchParams({ date: dateVal, system: SYSTEM_ID });
+  const res = await fetch(API_BASE + '/api/next-uhid?' + params.toString());
+  if (!res.ok) throw new Error('Could not generate UHID (server error)');
+  const data = await res.json();
+  return data.uhid;
+}
+
+const form = document.getElementById('recForm');
+const saveBtn = document.getElementById('saveBtn');
+const errBox = document.getElementById('errBox');
+const resultBox = document.getElementById('resultBox');
+const resultUhid = document.getElementById('resultUhid');
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  errBox.style.display = 'none';
+  resultBox.style.display = 'none';
+
+  const name = document.getElementById('rName').value.trim();
+  const age = document.getElementById('rAge').value.trim();
+  const sex = document.getElementById('rSex').value;
+  const mobile = document.getElementById('rMobile').value.trim();
+
+  if (!name || !age || !mobile) {
+    errBox.textContent = '⚠️ Naam, Age aur Mobile Number bharna zaroori hai.';
+    errBox.style.display = 'block';
+    return;
+  }
+
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving...';
+
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const uhid = await genUHID(today);
+
+    const patientData = {
+      id: uhid,
+      form: { name, age, sex, mobile, date: today, category: '', pmh: '', cc: '', billno: '', uhid },
+      items: [],
+      meds: [],
+      visits: [],
+      savedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString()
+    };
+
+    await apiFetch('/api/patients', { method: 'POST', body: patientData });
+
+    resultUhid.textContent = uhid;
+    resultBox.style.display = 'block';
+    form.reset();
+    document.getElementById('rSex').value = 'M';
+  } catch (err) {
+    errBox.textContent = '⚠️ Save nahi ho paaya: ' + err.message;
+    errBox.style.display = 'block';
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Patient';
+  }
+});
+</script>
+</body>
+</html>
