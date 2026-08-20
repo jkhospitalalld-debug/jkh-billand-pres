@@ -172,6 +172,78 @@ app.get('/api/next-uhid', async (c) => {
 });
 
 /* =========================================================
+   DAILY OPD TOKEN / QUEUE
+   ---------------------------------------------------------
+   IMPORTANT: this table is deliberately separate from patients.
+   Adding an old patient to today's OPD creates only a new token row;
+   it does NOT update patients.created_at, patients.date, or patient data.
+   ========================================================= */
+
+app.get('/api/opd-tokens', async (c) => {
+  const date = c.req.query('date') || new Date().toISOString().slice(0, 10);
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, opd_date, token_no, patient_id, uhid, patient_name, status, created_at
+     FROM opd_tokens WHERE opd_date = ? ORDER BY token_no ASC`
+  ).bind(date).all();
+  return c.json(results);
+});
+
+app.post('/api/opd-tokens', async (c) => {
+  const body = await c.req.json();
+  const patientId = String(body.patient_id || body.uhid || '').trim();
+  const date = String(body.opd_date || new Date().toISOString().slice(0, 10)).trim();
+  if (!patientId) return c.json({ error: 'Missing patient_id / UHID' }, 400);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return c.json({ error: 'Invalid OPD date' }, 400);
+
+  // Always read the master patient; never accept/edit master fields from the client.
+  const patient = await c.env.DB.prepare(
+    'SELECT id, name, data FROM patients WHERE id = ?'
+  ).bind(patientId).first();
+  if (!patient) return c.json({ error: 'Patient not found' }, 404);
+
+  const existing = await c.env.DB.prepare(
+    `SELECT id, opd_date, token_no, patient_id, uhid, patient_name, status, created_at
+     FROM opd_tokens WHERE opd_date = ? AND patient_id = ?`
+  ).bind(date, patient.id).first();
+  if (existing) return c.json({ ok: true, already_exists: true, token: existing });
+
+  let tokenNo = null;
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const maxRow = await c.env.DB.prepare(
+      'SELECT COALESCE(MAX(token_no), 0) AS max_token FROM opd_tokens WHERE opd_date = ?'
+    ).bind(date).first();
+    tokenNo = Number(maxRow?.max_token || 0) + 1;
+    const now = new Date().toISOString();
+    try {
+      await c.env.DB.prepare(
+        `INSERT INTO opd_tokens
+          (opd_date, token_no, patient_id, uhid, patient_name, status, created_at)
+         VALUES (?,?,?,?,?,?,?)`
+      ).bind(date, tokenNo, patient.id, patient.id, patient.name || '', 'Waiting', now).run();
+      const created = await c.env.DB.prepare(
+        `SELECT id, opd_date, token_no, patient_id, uhid, patient_name, status, created_at
+         FROM opd_tokens WHERE opd_date = ? AND token_no = ?`
+      ).bind(date, tokenNo).first();
+      return c.json({ ok: true, already_exists: false, token: created });
+    } catch (err) {
+      lastError = err;
+      // A concurrent reception device may have taken this token. Retry with the next max token.
+      if (!String(err?.message || err).toLowerCase().includes('unique')) throw err;
+    }
+  }
+  throw lastError || new Error('Could not create OPD token');
+});
+
+app.delete('/api/opd-tokens/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id <= 0) return c.json({ error: 'Invalid token id' }, 400);
+  const result = await c.env.DB.prepare('DELETE FROM opd_tokens WHERE id = ?').bind(id).run();
+  if (!result.meta?.changes) return c.json({ error: 'Token not found' }, 404);
+  return c.json({ ok: true });
+});
+
+/* =========================================================
    BILLING
    ========================================================= */
 
