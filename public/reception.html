@@ -3,76 +3,107 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Reception Entry - J. K. Hospital Dental Care Center</title>
+  <title>Reception - J. K. Hospital Dental Care Center</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    :root{
-      --bg:#f1f5f9;
-      --card:#ffffff;
-      --muted:#6b7280;
-      --accent:#0b5cff;
-      --primary:#0ea5a4;
-      --border:#e6e9ef;
-    }
+    :root{--bg:#f1f5f9;--card:#fff;--muted:#6b7280;--accent:#0b5cff;--primary:#0ea5a4;--danger:#dc2626;--border:#e6e9ef;--soft:#f8fafc}
     *{box-sizing:border-box}
     body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans',Arial;margin:0;padding:18px;background:var(--bg);color:#0f172a}
-    .container{max-width:480px;margin:40px auto}
-    .card{background:var(--card);border-radius:12px;padding:22px;box-shadow:0 8px 28px rgba(11,20,50,0.06);border:1px solid var(--border)}
+    .container{max-width:760px;margin:24px auto}
+    .card{background:var(--card);border-radius:14px;padding:20px;box-shadow:0 8px 28px rgba(11,20,50,.06);border:1px solid var(--border);margin-bottom:16px}
     header{display:flex;gap:12px;align-items:center;margin-bottom:18px}
-    .logo{width:52px;height:52px;border-radius:10px;object-fit:cover}
-    h1{margin:0;font-size:18px;color:var(--accent)}
-    p.sub{margin:2px 0 0;font-size:12px;color:var(--muted)}
-    label{font-size:13px;color:var(--muted);margin:14px 0 6px;display:block}
+    .logo{width:52px;height:52px;border-radius:10px;object-fit:cover}.headtext{flex:1}
+    h1{margin:0;font-size:18px;color:var(--accent)}h2{margin:0 0 12px;font-size:16px}p.sub{margin:2px 0 0;font-size:12px;color:var(--muted)}
+    label{font-size:13px;color:var(--muted);margin:12px 0 6px;display:block}
     input[type="text"],input[type="number"],select{width:100%;padding:11px;border-radius:10px;border:1px solid var(--border);background:#fff;font-size:16px}
-    .btn{margin-top:20px;width:100%;padding:13px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-size:16px;font-weight:600;cursor:pointer}
-    .btn:disabled{opacity:0.6;cursor:not-allowed}
-    .result{margin-top:16px;padding:14px;border-radius:10px;background:#ecfdf5;border:1px solid #10b98155;display:none;text-align:center}
-    .result .uhid{font-size:22px;font-weight:700;color:#065f46;letter-spacing:0.5px}
+    .btn{padding:11px 14px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-size:14px;font-weight:600;cursor:pointer}.btn:disabled{opacity:.6;cursor:not-allowed}
+    .btn.secondary{background:#e2e8f0;color:#0f172a}.btn.danger{background:#fee2e2;color:#b91c1c;border:1px solid #fecaca}.btn.small{padding:8px 10px;font-size:12px}
+    .full{width:100%;margin-top:16px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.searchrow{display:flex;gap:8px}.searchrow input{flex:1}
+    .result{margin-top:14px;padding:14px;border-radius:10px;background:#ecfdf5;border:1px solid #10b98155;display:none;text-align:center}.result .uhid{font-size:22px;font-weight:700;color:#065f46;letter-spacing:.5px}
     .err{margin-top:12px;padding:10px;border-radius:8px;background:#fef2f2;border:1px solid #ef444455;color:#b91c1c;font-size:13px;display:none}
+    .ok{margin-top:12px;padding:10px;border-radius:8px;background:#ecfdf5;border:1px solid #10b98155;color:#065f46;font-size:13px;display:none}
+    .sectionhead{display:flex;justify-content:space-between;align-items:center;gap:10px}.date{font-size:13px;color:var(--muted);font-weight:600}
+    .list{margin-top:12px}.empty{padding:20px;text-align:center;color:var(--muted);background:var(--soft);border-radius:10px;font-size:13px}
+    .patient{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--border);border-radius:11px;margin-bottom:8px;background:#fff}.patientmain{flex:1;min-width:0}.patientname{font-weight:600}.meta{font-size:12px;color:var(--muted);margin-top:3px}.token{width:48px;height:48px;border-radius:12px;background:#eff6ff;color:#1d4ed8;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700}.actions{display:flex;gap:7px;align-items:center}
+    .searchresults{margin-top:10px}.hint{font-size:12px;color:var(--muted);margin-top:8px}.badge{display:inline-block;padding:3px 7px;border-radius:999px;background:#f1f5f9;font-size:11px;color:#475569}
+    .divider{border:0;border-top:1px solid var(--border);margin:20px 0}
+    @media(max-width:600px){body{padding:10px}.container{margin:10px auto}.row{grid-template-columns:1fr}.patient{align-items:flex-start}.actions{flex-direction:column}.actions .btn{width:100%}.token{flex:0 0 48px}}
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="card">
-      <header>
-        <img src="LOGO.jpg" class="logo" onerror="this.style.display='none'" />
-        <div>
-          <h1>J. K. Hospital Dental Care Center</h1>
-          <p class="sub">Reception Entry — New Patient Registration</p>
-        </div>
-      </header>
+<div class="container">
+  <div class="card">
+    <header>
+      <img src="LOGO.jpg" class="logo" onerror="this.style.display='none'" />
+      <div class="headtext">
+        <h1>J. K. Hospital Dental Care Center</h1>
+        <p class="sub">Reception — Patient Registration & Today's OPD</p>
+      </div>
+    </header>
 
-      <form id="recForm">
-        <label for="rName">Patient Name *</label>
-        <input type="text" id="rName" required autocomplete="off" />
-
-        <label for="rAge">Age *</label>
-        <input type="number" id="rAge" min="0" max="130" required />
-
-        <label for="rSex">Sex *</label>
-        <select id="rSex" required>
-          <option value="M">Male</option>
-          <option value="F">Female</option>
-          <option value="O">Other</option>
-        </select>
-
-        <label for="rMobile">Mobile Number *</label>
-        <input type="text" id="rMobile" inputmode="numeric" required autocomplete="off" />
-
-        <button type="submit" class="btn" id="saveBtn">Save Patient</button>
-        <div class="err" id="errBox"></div>
-        <div class="result" id="resultBox">
-          Patient saved ✅<br/>
-          UHID: <span class="uhid" id="resultUhid"></span>
-        </div>
-      </form>
+    <h2>Today's OPD / Patient Queue</h2>
+    <div class="sectionhead">
+      <div class="date" id="todayLabel"></div>
+      <button type="button" class="btn secondary small" id="refreshBtn">Refresh</button>
     </div>
+    <div class="list" id="opdList"><div class="empty">Loading today's OPD…</div></div>
+    <div class="err" id="opdErr"></div>
   </div>
 
+  <div class="card">
+    <h2>Search Existing Patient</h2>
+    <div class="searchrow">
+      <input type="text" id="searchInput" placeholder="Name / Mobile / UHID" autocomplete="off" />
+      <button type="button" class="btn" id="searchBtn">Search</button>
+    </div>
+    <div class="hint">Purane patient ko aaj ke OPD mein add karne par patient master record mein koi change nahi hoga.</div>
+    <div class="searchresults" id="searchResults"></div>
+    <div class="err" id="searchErr"></div>
+  </div>
+
+  <div class="card">
+    <h2>New Patient Registration</h2>
+    <form id="recForm">
+      <label for="rName">Patient Name *</label>
+      <input type="text" id="rName" required autocomplete="off" />
+      <div class="row">
+        <div><label for="rAge">Age *</label><input type="number" id="rAge" min="0" max="130" required /></div>
+        <div><label for="rSex">Sex *</label><select id="rSex" required><option value="M">Male</option><option value="F">Female</option><option value="O">Other</option></select></div>
+      </div>
+      <label for="rMobile">Mobile Number *</label>
+      <input type="text" id="rMobile" inputmode="numeric" required autocomplete="off" />
+      <button type="submit" class="btn full" id="saveBtn">Save New Patient</button>
+      <div class="err" id="errBox"></div>
+      <div class="result" id="resultBox">Patient saved ✅<br/>UHID: <span class="uhid" id="resultUhid"></span></div>
+    </form>
+  </div>
+</div>
+
 <script>
-const API_BASE = ''; // same-origin, served from this same Worker
-const SYSTEM_ID = "XR"; // keep same as main app so UHID numbering stays shared
+const API_BASE = '';
+const SYSTEM_ID = 'XR';
+let allPatients = [];
+
+function localDateISO() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+function displayDate(iso) {
+  const [y,m,d] = iso.split('-');
+  return `${d}-${m}-${y}`;
+}
+function esc(value) {
+  return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+}
+function patientName(p) { return p.form?.name || p.name || ''; }
+function patientMobile(p) { return p.form?.mobile || p.mobile || ''; }
+function patientAge(p) { return p.form?.age || p.age || ''; }
+function patientSex(p) { return p.form?.sex || p.sex || ''; }
+function patientDate(p) { return p.created_at || p.createdAt || p.savedAt || ''; }
 
 async function apiFetch(path, opts = {}) {
   const res = await fetch(API_BASE + path, {
@@ -84,14 +115,122 @@ async function apiFetch(path, opts = {}) {
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
 }
-
 async function genUHID(dateVal) {
   const params = new URLSearchParams({ date: dateVal, system: SYSTEM_ID });
   const res = await fetch(API_BASE + '/api/next-uhid?' + params.toString());
   if (!res.ok) throw new Error('Could not generate UHID (server error)');
-  const data = await res.json();
-  return data.uhid;
+  return (await res.json()).uhid;
 }
+
+const today = localDateISO();
+document.getElementById('todayLabel').textContent = `Date: ${displayDate(today)}`;
+
+async function loadPatients() {
+  allPatients = await apiFetch('/api/patients');
+}
+
+async function loadTodayOPD() {
+  const list = document.getElementById('opdList');
+  const err = document.getElementById('opdErr');
+  err.style.display = 'none';
+  list.innerHTML = '<div class="empty">Loading today\'s OPD…</div>';
+  try {
+    const rows = await apiFetch('/api/opd-tokens?date=' + encodeURIComponent(today));
+    if (!rows.length) {
+      list.innerHTML = '<div class="empty">Aaj abhi koi patient OPD mein add nahi hua.</div>';
+      return;
+    }
+    list.innerHTML = rows.map(row => `
+      <div class="patient">
+        <div class="token">${esc(row.token_no)}</div>
+        <div class="patientmain">
+          <div class="patientname">${esc(row.patient_name)}</div>
+          <div class="meta">UHID: ${esc(row.uhid)} &nbsp; <span class="badge">${esc(row.status)}</span></div>
+        </div>
+        <div class="actions"><button type="button" class="btn danger small" data-delete-token="${esc(row.id)}" data-patient="${esc(row.patient_name)}" data-token="${esc(row.token_no)}">Delete Token</button></div>
+      </div>`).join('');
+  } catch (e) {
+    list.innerHTML = '<div class="empty">Today\'s OPD load nahi ho paaya.</div>';
+    err.textContent = '⚠️ ' + e.message;
+    err.style.display = 'block';
+  }
+}
+
+document.getElementById('opdList').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-delete-token]');
+  if (!btn) return;
+  const id = btn.dataset.deleteToken;
+  const patient = btn.dataset.patient;
+  const token = btn.dataset.token;
+  if (!confirm(`Delete Token ${token} — ${patient}?\n\nSirf aaj ki OPD entry delete hogi. Patient master record safe rahega.`)) return;
+  btn.disabled = true;
+  try {
+    await apiFetch('/api/opd-tokens/' + encodeURIComponent(id), { method: 'DELETE' });
+    await loadTodayOPD();
+  } catch (e) {
+    btn.disabled = false;
+    const err = document.getElementById('opdErr');
+    err.textContent = '⚠️ Token delete nahi ho paaya: ' + e.message;
+    err.style.display = 'block';
+  }
+});
+
+function renderSearchResults(query) {
+  const box = document.getElementById('searchResults');
+  const q = query.trim().toLowerCase();
+  if (!q) { box.innerHTML = ''; return; }
+  const matches = allPatients.filter(p => {
+    const hay = [p.id, patientName(p), patientMobile(p), patientAge(p)].join(' ').toLowerCase();
+    return hay.includes(q);
+  }).slice(0, 20);
+  if (!matches.length) {
+    box.innerHTML = '<div class="empty">Koi existing patient nahi mila.</div>';
+    return;
+  }
+  box.innerHTML = matches.map(p => `
+    <div class="patient">
+      <div class="patientmain">
+        <div class="patientname">${esc(patientName(p))}</div>
+        <div class="meta">UHID: ${esc(p.id)} · Age: ${esc(patientAge(p))} · Mobile: ${esc(patientMobile(p))}</div>
+      </div>
+      <div class="actions"><button type="button" class="btn small" data-add-opd="${esc(p.id)}">Add to Today's OPD</button></div>
+    </div>`).join('');
+}
+
+document.getElementById('searchBtn').addEventListener('click', () => renderSearchResults(document.getElementById('searchInput').value));
+document.getElementById('searchInput').addEventListener('input', () => renderSearchResults(document.getElementById('searchInput').value));
+document.getElementById('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); renderSearchResults(e.target.value); } });
+
+document.getElementById('searchResults').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-add-opd]');
+  if (!btn) return;
+  const uhid = btn.dataset.addOpd;
+  btn.disabled = true;
+  btn.textContent = 'Adding…';
+  const err = document.getElementById('searchErr');
+  const ok = document.getElementById('searchResults');
+  err.style.display = 'none';
+  try {
+    const data = await apiFetch('/api/opd-tokens', { method: 'POST', body: { patient_id: uhid, opd_date: today } });
+    const token = data.token;
+    btn.textContent = data.already_exists ? `Already Token ${token.token_no}` : `Token ${token.token_no}`;
+    await loadTodayOPD();
+    if (!data.already_exists) renderSearchResults(document.getElementById('searchInput').value);
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = 'Add to Today\'s OPD';
+    err.textContent = '⚠️ OPD mein add nahi ho paaya: ' + e.message;
+    err.style.display = 'block';
+  }
+});
+
+document.getElementById('refreshBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true; btn.textContent = 'Refreshing…';
+  try { await Promise.all([loadPatients(), loadTodayOPD()]); renderSearchResults(document.getElementById('searchInput').value); }
+  catch(e) { const err=document.getElementById('searchErr'); err.textContent='⚠️ Refresh nahi ho paaya: '+e.message; err.style.display='block'; }
+  finally { btn.disabled=false; btn.textContent='Refresh'; }
+});
 
 const form = document.getElementById('recForm');
 const saveBtn = document.getElementById('saveBtn');
@@ -101,51 +240,37 @@ const resultUhid = document.getElementById('resultUhid');
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
-  errBox.style.display = 'none';
-  resultBox.style.display = 'none';
-
+  errBox.style.display = 'none'; resultBox.style.display = 'none';
   const name = document.getElementById('rName').value.trim();
   const age = document.getElementById('rAge').value.trim();
   const sex = document.getElementById('rSex').value;
   const mobile = document.getElementById('rMobile').value.trim();
-
   if (!name || !age || !mobile) {
-    errBox.textContent = '⚠️ Naam, Age aur Mobile Number bharna zaroori hai.';
-    errBox.style.display = 'block';
-    return;
+    errBox.textContent = '⚠️ Naam, Age aur Mobile Number bharna zaroori hai.'; errBox.style.display='block'; return;
   }
-
-  saveBtn.disabled = true;
-  saveBtn.textContent = 'Saving...';
-
+  saveBtn.disabled=true; saveBtn.textContent='Saving…';
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    // IMPORTANT: this is the existing new-patient flow. Existing patients are NEVER
+    // updated here; old patients use the separate /api/opd-tokens endpoint above.
     const uhid = await genUHID(today);
-
+    const now = new Date().toISOString();
     const patientData = {
       id: uhid,
-      form: { name, age, sex, mobile, date: today, category: '', pmh: '', cc: '', billno: '', uhid },
-      items: [],
-      meds: [],
-      visits: [],
-      savedAt: new Date().toISOString(),
-      createdAt: new Date().toISOString()
+      form: { name, age, sex, mobile, date: today, category:'', pmh:'', cc:'', billno:'', uhid },
+      items: [], meds: [], visits: [], savedAt: now, createdAt: now
     };
-
-    await apiFetch('/api/patients', { method: 'POST', body: patientData });
-
-    resultUhid.textContent = uhid;
-    resultBox.style.display = 'block';
-    form.reset();
-    document.getElementById('rSex').value = 'M';
+    await apiFetch('/api/patients', { method:'POST', body:patientData });
+    resultUhid.textContent=uhid; resultBox.style.display='block'; form.reset(); document.getElementById('rSex').value='M';
+    await Promise.all([loadPatients(), loadTodayOPD()]);
   } catch (err) {
-    errBox.textContent = '⚠️ Save nahi ho paaya: ' + err.message;
-    errBox.style.display = 'block';
-  } finally {
-    saveBtn.disabled = false;
-    saveBtn.textContent = 'Save Patient';
-  }
+    errBox.textContent='⚠️ Save nahi ho paaya: '+err.message; errBox.style.display='block';
+  } finally { saveBtn.disabled=false; saveBtn.textContent='Save New Patient'; }
 });
+
+(async function init(){
+  try { await Promise.all([loadPatients(), loadTodayOPD()]); }
+  catch(e){ document.getElementById('searchErr').textContent='⚠️ Data load nahi ho paaya: '+e.message; document.getElementById('searchErr').style.display='block'; }
+})();
 </script>
 </body>
 </html>
