@@ -1766,6 +1766,11 @@ saveRxBtn.addEventListener('click', () => {
 
   saveAll();
 
+  if (!form.name || !form.name.trim() || !form.age || !String(form.age).trim() || !form.mobile || !form.mobile.trim()) {
+    alert('⚠️ Patient ka Naam, Age aur Mobile number bharna zaroori hai — tab hi form save hoga.');
+    return;
+  }
+
   const patientData = {
   id: uhidEl.value,
   form: {...form},
@@ -2858,9 +2863,12 @@ function scheduleSave(){
 }
 function saveBill(manual){
   const bill=collectBill();
-  const isEmpty = !bill.name && !bill.phone && bill.lines.length===0;
+  const hasPatientDetails = !!(bill.name && bill.name.trim());
+  const grandTotal = parseFloat(String(bill.total || '0').replace(/,/g,'')) || 0;
+  const hasProcedureOrAmount = bill.lines.length > 0 && grandTotal > 0;
+  const isEmpty = !hasPatientDetails || !hasProcedureOrAmount;
   if(isEmpty){
-    if(manual) toast('Nothing to save yet.',true);
+    if(manual) toast('Patient details, kam se kam ek procedure/item aur amount zaroori hai bill save karne ke liye.',true);
     setSaveStatus('saved');
     return;
   }
