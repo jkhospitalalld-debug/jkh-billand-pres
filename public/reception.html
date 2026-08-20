@@ -18,18 +18,29 @@
     *{box-sizing:border-box}
     body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans',Arial;margin:0;padding:18px;background:var(--bg);color:#0f172a}
     .container{max-width:480px;margin:40px auto}
-    .card{background:var(--card);border-radius:12px;padding:22px;box-shadow:0 8px 28px rgba(11,20,50,0.06);border:1px solid var(--border)}
+    .card{background:var(--card);border-radius:12px;padding:22px;box-shadow:0 8px 28px rgba(11,20,50,0.06);border:1px solid var(--border);margin-bottom:18px}
     header{display:flex;gap:12px;align-items:center;margin-bottom:18px}
     .logo{width:52px;height:52px;border-radius:10px;object-fit:cover}
     h1{margin:0;font-size:18px;color:var(--accent)}
+    h2{margin:0 0 12px;font-size:15px;color:#0f172a}
     p.sub{margin:2px 0 0;font-size:12px;color:var(--muted)}
     label{font-size:13px;color:var(--muted);margin:14px 0 6px;display:block}
     input[type="text"],input[type="number"],select{width:100%;padding:11px;border-radius:10px;border:1px solid var(--border);background:#fff;font-size:16px}
     .btn{margin-top:20px;width:100%;padding:13px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-size:16px;font-weight:600;cursor:pointer}
     .btn:disabled{opacity:0.6;cursor:not-allowed}
+    .btn-sm{margin-top:0;width:auto;padding:7px 12px;font-size:13px;border-radius:8px;background:var(--accent)}
     .result{margin-top:16px;padding:14px;border-radius:10px;background:#ecfdf5;border:1px solid #10b98155;display:none;text-align:center}
     .result .uhid{font-size:22px;font-weight:700;color:#065f46;letter-spacing:0.5px}
     .err{margin-top:12px;padding:10px;border-radius:8px;background:#fef2f2;border:1px solid #ef444455;color:#b91c1c;font-size:13px;display:none}
+    table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+    th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--border)}
+    th{color:var(--muted);font-weight:600;font-size:12px}
+    .tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+    .tag-new{background:#ecfdf5;color:#065f46}
+    .tag-old{background:#fff7ed;color:#9a3412}
+    .muted{color:var(--muted);font-size:13px}
+    .searchRow{display:flex;gap:8px;margin-top:0}
+    .searchRow input{flex:1}
   </style>
 </head>
 <body>
@@ -68,11 +79,25 @@
         </div>
       </form>
     </div>
+
+    <div class="card">
+      <h2>Purana Patient? Search karein</h2>
+      <div class="searchRow">
+        <input type="text" id="searchBox" placeholder="Naam ya Mobile Number likhein..." autocomplete="off" />
+      </div>
+      <div id="searchResults"></div>
+    </div>
+
+    <div class="card">
+      <h2>Aaj ke Patients (<span id="todayDateLabel"></span>)</h2>
+      <div id="todayListBox"><p class="muted">Loading...</p></div>
+    </div>
   </div>
 
 <script>
 const API_BASE = ''; // same-origin, served from this same Worker
 const SYSTEM_ID = "XR"; // keep same as main app so UHID numbering stays shared
+let allPatients = [];
 
 async function apiFetch(path, opts = {}) {
   const res = await fetch(API_BASE + path, {
@@ -93,6 +118,22 @@ async function genUHID(dateVal) {
   return data.uhid;
 }
 
+async function loadAllPatients() {
+  try {
+    allPatients = await apiFetch('/api/patients');
+  } catch (err) {
+    console.warn('Could not load patients:', err.message);
+    allPatients = [];
+  }
+}
+
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+function isOnDate(dateStr, targetDateStr) {
+  if (!dateStr) return false;
+  return String(dateStr).slice(0, 10) === targetDateStr;
+}
+
+/* ---------- Save new patient ---------- */
 const form = document.getElementById('recForm');
 const saveBtn = document.getElementById('saveBtn');
 const errBox = document.getElementById('errBox');
@@ -119,7 +160,7 @@ form.addEventListener('submit', async (e) => {
   saveBtn.textContent = 'Saving...';
 
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayStr();
     const uhid = await genUHID(today);
 
     const patientData = {
@@ -138,6 +179,9 @@ form.addEventListener('submit', async (e) => {
     resultBox.style.display = 'block';
     form.reset();
     document.getElementById('rSex').value = 'M';
+
+    await loadAllPatients();
+    renderTodayList();
   } catch (err) {
     errBox.textContent = '⚠️ Save nahi ho paaya: ' + err.message;
     errBox.style.display = 'block';
@@ -146,6 +190,122 @@ form.addEventListener('submit', async (e) => {
     saveBtn.textContent = 'Save Patient';
   }
 });
+
+/* ---------- Search old patient ---------- */
+const searchBox = document.getElementById('searchBox');
+const searchResults = document.getElementById('searchResults');
+
+searchBox.addEventListener('input', () => {
+  const q = searchBox.value.trim().toLowerCase();
+  if (!q) { searchResults.innerHTML = ''; return; }
+  const matches = allPatients.filter(p => {
+    const name = (p.form?.name || '').toLowerCase();
+    const mobile = (p.form?.mobile || '').toLowerCase();
+    const uhid = (p.id || '').toLowerCase();
+    return name.includes(q) || mobile.includes(q) || uhid.includes(q);
+  }).slice(0, 15);
+
+  if (!matches.length) {
+    searchResults.innerHTML = '<p class="muted">Koi patient nahi mila.</p>';
+    return;
+  }
+
+  searchResults.innerHTML = `
+    <table>
+      <thead><tr><th>UHID</th><th>Naam</th><th>Mobile</th><th></th></tr></thead>
+      <tbody>
+        ${matches.map(p => `
+          <tr>
+            <td>${p.id}</td>
+            <td>${p.form?.name || ''}</td>
+            <td>${p.form?.mobile || ''}</td>
+            <td><button class="btn btn-sm" data-uhid="${p.id}">Aaj Aaya</button></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+
+  searchResults.querySelectorAll('button[data-uhid]').forEach(btn => {
+    btn.addEventListener('click', () => confirmArrival(btn.getAttribute('data-uhid'), btn));
+  });
+});
+
+async function confirmArrival(uhid, btnEl) {
+  const patient = allPatients.find(p => p.id === uhid);
+  if (!patient) return;
+  btnEl.disabled = true;
+  btnEl.textContent = '...';
+  try {
+    const today = todayStr();
+    const updated = {
+      id: patient.id,
+      form: { ...(patient.form || {}), date: today },
+      items: patient.items || [],
+      meds: patient.meds || [],
+      visits: patient.visits || []
+    };
+    await apiFetch('/api/patients', { method: 'POST', body: updated });
+    btnEl.textContent = 'Confirmed ✅';
+    await loadAllPatients();
+    renderTodayList();
+  } catch (err) {
+    btnEl.disabled = false;
+    btnEl.textContent = 'Aaj Aaya';
+    alert('⚠️ Confirm nahi ho paaya: ' + err.message);
+  }
+}
+
+/* ---------- Today's numbered list (New + Old) ---------- */
+function renderTodayList() {
+  const today = todayStr();
+  const dateKey = today.replace(/-/g, '');
+
+  const todays = allPatients.filter(p => {
+    return isOnDate(p.form?.date, today) || isOnDate(p.updated_at || p.updatedAt, today);
+  });
+
+  // Sort by registration/update time = arrival order for numbering
+  todays.sort((a, b) => new Date(a.updated_at || a.createdAt || 0) - new Date(b.updated_at || b.createdAt || 0));
+
+  document.getElementById('todayDateLabel').textContent =
+    new Date(today + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  const box = document.getElementById('todayListBox');
+  if (!todays.length) {
+    box.innerHTML = '<p class="muted">Aaj koi patient abhi tak nahi.</p>';
+    return;
+  }
+
+  box.innerHTML = `
+    <table>
+      <thead><tr><th>#</th><th>UHID</th><th>Naam</th><th>Age/Sex</th><th>Mobile</th><th></th></tr></thead>
+      <tbody>
+        ${todays.map((p, i) => {
+          const uhidPrefix = (p.id || '').slice(0, 8);
+          const isNew = uhidPrefix === dateKey;
+          return `
+            <tr>
+              <td>${i + 1}</td>
+              <td>${p.id}</td>
+              <td>${p.form?.name || ''}</td>
+              <td>${p.form?.age || ''}/${p.form?.sex || ''}</td>
+              <td>${p.form?.mobile || ''}</td>
+              <td><span class="tag ${isNew ? 'tag-new' : 'tag-old'}">${isNew ? 'New' : 'Old'}</span></td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+/* ---------- Init ---------- */
+(async function init() {
+  await loadAllPatients();
+  renderTodayList();
+})();
 </script>
 </body>
 </html>
+
