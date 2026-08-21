@@ -147,7 +147,12 @@ async function loadTodayOPD() {
           <div class="patientname">${esc(row.patient_name)}</div>
           <div class="meta">UHID: ${esc(row.uhid)} &nbsp; <span class="badge">${esc(row.status)}</span></div>
         </div>
-        <div class="actions"><button type="button" class="btn danger small" data-delete-token="${esc(row.id)}" data-patient="${esc(row.patient_name)}" data-token="${esc(row.token_no)}">Delete Token</button></div>
+        <div class="actions">
+          ${row.status === 'Waiting' ? `<button type="button" class="btn small" data-status="In Consultation" data-id="${esc(row.id)}">In Consultation</button>` : ''}
+          ${row.status === 'In Consultation' ? `<button type="button" class="btn small" data-status="Completed" data-id="${esc(row.id)}">Completed</button>` : ''}
+          ${row.status !== 'Completed' && row.status !== 'Cancelled' ? `<button type="button" class="btn danger small" data-status="Cancelled" data-id="${esc(row.id)}">Cancel</button>` : ''}
+          <button type="button" class="btn danger small" data-delete-token="${esc(row.id)}" data-patient="${esc(row.patient_name)}" data-token="${esc(row.token_no)}">Delete Token</button>
+        </div>
       </div>`).join('');
   } catch (e) {
     list.innerHTML = '<div class="empty">Today\'s OPD load nahi ho paaya.</div>';
@@ -157,6 +162,22 @@ async function loadTodayOPD() {
 }
 
 document.getElementById('opdList').addEventListener('click', async (e) => {
+  const statusBtn = e.target.closest('[data-status]');
+  if (statusBtn) {
+    const id = statusBtn.dataset.id;
+    const status = statusBtn.dataset.status;
+    statusBtn.disabled = true;
+    try {
+      await apiFetch('/api/opd-tokens/' + encodeURIComponent(id), { method: 'PATCH', body: { status } });
+      await loadTodayOPD();
+    } catch (err) {
+      statusBtn.disabled = false;
+      const box = document.getElementById('opdErr');
+      box.textContent = '⚠️ Status update nahi ho paaya: ' + err.message;
+      box.style.display = 'block';
+    }
+    return;
+  }
   const btn = e.target.closest('[data-delete-token]');
   if (!btn) return;
   const id = btn.dataset.deleteToken;

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>JKH Dental — Waiting Room</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f7fb;color:#172033;font-family:Arial,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.wrap{width:min(1100px,94vw);text-align:center}.brand{font-size:clamp(22px,3vw,42px);font-weight:800;margin-bottom:8px}.sub{font-size:clamp(14px,1.6vw,22px);color:#667085;margin-bottom:32px}.card{background:#fff;border-radius:24px;padding:28px;box-shadow:0 8px 35px rgba(0,0,0,.08)}.label{font-size:clamp(16px,2vw,26px);font-weight:700;color:#667085;text-transform:uppercase;letter-spacing:.08em}.now{font-size:clamp(72px,15vw,180px);font-weight:900;line-height:1;margin:12px 0 8px}.hint{font-size:clamp(16px,2vw,28px);font-weight:700}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px}.box{background:#f7f8fa;border-radius:18px;padding:20px}.box h2{margin:0 0 14px;font-size:clamp(18px,2vw,28px)}.tokens{font-size:clamp(26px,3vw,44px);font-weight:800;word-spacing:18px}.muted{color:#98a2b3;font-size:20px}.footer{margin-top:18px;color:#98a2b3;font-size:14px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}.card{padding:18px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">J.K. HOSPITAL DENTAL CARE CENTER</div>
+  <div class="sub" id="dateLabel">Today's OPD</div>
+  <div class="card">
+    <div class="label">Now Serving</div>
+    <div class="now" id="nowToken">—</div>
+    <div class="hint" id="nowHint">Please wait for your token</div>
+    <div class="grid">
+      <div class="box"><h2>In Consultation</h2><div class="tokens" id="consulting">—</div></div>
+      <div class="box"><h2>Waiting</h2><div class="tokens" id="waiting">—</div></div>
+    </div>
+  </div>
+  <div class="footer">Please keep your token number with you.</div>
+</div>
+<script>
+function localDateISO(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function displayDate(iso){const [y,m,d]=iso.split('-');return `${d}-${m}-${y}`}
+async function load(){
+  try{
+    const date=localDateISO();
+    const r=await fetch('/api/waiting-display?date='+encodeURIComponent(date));
+    if(!r.ok) throw new Error('load failed');
+    const d=await r.json();
+    document.getElementById('dateLabel').textContent='Today\'s OPD — '+displayDate(date);
+    document.getElementById('nowToken').textContent=d.latest_token ?? '—';
+    document.getElementById('nowHint').textContent=d.latest_token ? 'Please proceed to the doctor' : 'Please wait for your token';
+    document.getElementById('consulting').textContent=d.in_consultation.length ? d.in_consultation.join('  ·  ') : '—';
+    document.getElementById('waiting').textContent=d.waiting.length ? d.waiting.join('  ·  ') : '—';
+  }catch(e){document.getElementById('nowHint').textContent='Display temporarily unavailable';}
+}
+load();setInterval(load,3000);
+</script>
+</body></html>
