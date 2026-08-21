@@ -235,6 +235,36 @@ app.post('/api/opd-tokens', async (c) => {
   throw lastError || new Error('Could not create OPD token');
 });
 
+app.patch('/api/opd-tokens/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id <= 0) return c.json({ error: 'Invalid token id' }, 400);
+  const { status } = await c.req.json();
+  const allowed = ['Waiting', 'In Consultation', 'Completed', 'Cancelled'];
+  if (!allowed.includes(status)) return c.json({ error: 'Invalid status' }, 400);
+  const result = await c.env.DB.prepare('UPDATE opd_tokens SET status = ? WHERE id = ?').bind(status, id).run();
+  if (!result.meta?.changes) return c.json({ error: 'Token not found' }, 404);
+  const token = await c.env.DB.prepare(
+    'SELECT id, opd_date, token_no, patient_id, uhid, patient_name, status, created_at FROM opd_tokens WHERE id = ?'
+  ).bind(id).first();
+  return c.json({ ok: true, token });
+});
+
+// Public waiting-room display: token numbers/status only. No names, UHID or patient data.
+app.get('/api/waiting-display', async (c) => {
+  const date = c.req.query('date') || new Date().toISOString().slice(0, 10);
+  const { results } = await c.env.DB.prepare(
+    'SELECT token_no, status FROM opd_tokens WHERE opd_date = ? ORDER BY token_no ASC'
+  ).bind(date).all();
+  const consulting = results.filter(r => r.status === 'In Consultation').map(r => Number(r.token_no));
+  const latest = consulting.length ? Math.max(...consulting) : null;
+  return c.json({
+    date,
+    latest_token: latest,
+    in_consultation: consulting,
+    waiting: results.filter(r => r.status === 'Waiting').map(r => Number(r.token_no))
+  });
+});
+
 app.delete('/api/opd-tokens/:id', async (c) => {
   const id = Number(c.req.param('id'));
   if (!Number.isInteger(id) || id <= 0) return c.json({ error: 'Invalid token id' }, 400);
