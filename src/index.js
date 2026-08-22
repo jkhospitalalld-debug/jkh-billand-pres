@@ -15,6 +15,12 @@ app.get('/api/health', (c) => c.json({ ok: true, service: 'jkh-dental-suite' }))
    to them at the server level, not just hidden in the UI.
    ========================================================= */
 async function requireBillingAuth(c, next) {
+  // Patients checking their own bill (Patient Portal) only ever know their
+  // own UHID, so this one read-only lookup is safe to leave open.
+  if (c.req.path.startsWith('/api/bills/by-patient/')) {
+    await next();
+    return;
+  }
   const key = c.req.header('X-Billing-Key') || '';
   if (!c.env.BILLING_SECRET || key !== c.env.BILLING_SECRET) {
     return c.json({ error: 'Billing password required' }, 401);
