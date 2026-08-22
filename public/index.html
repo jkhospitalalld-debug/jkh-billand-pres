@@ -601,6 +601,7 @@
       <button onclick="openRegister()">Register</button>
       <button onclick="openDailyReport()">📅 Daily Collection</button>
       <button onclick="openProcAdmin()">⚙ Procedures</button>
+      <button class="ghost" type="button" onclick="billingLogout()">🔒 Logout</button>
     </div>
   </div>
 </div>
@@ -903,15 +904,49 @@ document.getElementById('newBillLink').addEventListener('click', (e) => {
 
 // Wrapper around fetch that adds the login token and gracefully handles
 // being offline or logged out - callers should not assume this always succeeds.
+let BILLING_KEY = sessionStorage.getItem('jkh_billing_key') || null;
+
 async function apiFetch(path, opts = {}) {
   const res = await fetch(API_BASE + path, {
     ...opts,
-    headers: { 'Content-Type': 'application/json', ...(AUTH_TOKEN ? { Authorization: 'Bearer ' + AUTH_TOKEN } : {}), ...(opts.headers || {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(AUTH_TOKEN ? { Authorization: 'Bearer ' + AUTH_TOKEN } : {}),
+      ...(BILLING_KEY ? { 'X-Billing-Key': BILLING_KEY } : {}),
+      ...(opts.headers || {})
+    },
     body: opts.body ? JSON.stringify(opts.body) : undefined
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || 'Request failed');
   return data;
+}
+
+// Billing is password-locked (doctor only). Once entered correctly, the
+// password is kept in sessionStorage - stays logged in across bills/patients
+// for the rest of this browser session, and clears automatically when the
+// browser/computer is closed. "Logout" (button inside Billing) clears it early.
+async function ensureBillingAuth() {
+  if (BILLING_KEY) return true; // trust existing session key; a wrong key will surface as a 401 on the next real call
+  const entered = prompt('🔒 Billing Password:');
+  if (!entered) return false;
+  try {
+    const res = await fetch(API_BASE + '/api/billing-auth-check', { headers: { 'X-Billing-Key': entered } });
+    if (!res.ok) { alert('❌ Galat billing password.'); return false; }
+    BILLING_KEY = entered;
+    sessionStorage.setItem('jkh_billing_key', BILLING_KEY);
+    return true;
+  } catch (err) {
+    alert('⚠️ Password check nahi ho paaya: ' + err.message);
+    return false;
+  }
+}
+
+function billingLogout() {
+  BILLING_KEY = null;
+  sessionStorage.removeItem('jkh_billing_key');
+  closeBillSection();
+  toast('Billing se logout ho gaye.');
 }
 
 const KEY_REGISTRY = 'ref_patient_registry_v9';
@@ -1149,10 +1184,11 @@ async function refreshLinkedBill(){
   const uhid = uhidEl.value;
   const chipsEl = document.getElementById('billChips');
   if (!uhid) { billEl.value=''; chipsEl.innerHTML=''; return; }
+  // Billing is password-locked - if not unlocked this session yet, just skip
+  // showing the bill number/chips here (OPD form itself still works fine).
+  if (!BILLING_KEY) { billEl.value = uhid; chipsEl.innerHTML = ''; return; }
   try {
-    const res = await fetch(API_BASE + '/api/bills/by-patient/' + encodeURIComponent(uhid));
-    if (!res.ok) throw new Error('server error');
-    const bills = await res.json();
+    const bills = await apiFetch('/api/bills/by-patient/' + encodeURIComponent(uhid));
     if (bills.length) {
       billEl.value = bills[0].no;
       renderBillChips(uhid, bills);
@@ -3465,16 +3501,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Replaces the old iframe + URL-param handoff. Same page, same JS scope now,
 // so there is no "linked patient" state that can ever go stale or desync -
 // every open explicitly loads the right bill for the patient on screen.
-async function flushPendingSave(){
+async function openBillSection(exactNo, forceNew) {
+  const uhid = uhidEl.value;
+  if (!uhid) { alert('Pehle UHID generate hone do.'); return; }
+  const authed = await ensureBillingAuth();
+  if (!authed) return;
   if(dirty){
     clearTimeout(saveTimer);
     await saveBill(false);
   }
-}
-async function openBillSection(exactNo, forceNew) {
-  const uhid = uhidEl.value;
-  if (!uhid) { alert('Pehle UHID generate hone do.'); return; }
-  await flushPendingSave();
   document.getElementById('billSection').style.display = 'block';
   document.body.style.overflow = 'hidden';
   linkedPatientUHID = uhid;
