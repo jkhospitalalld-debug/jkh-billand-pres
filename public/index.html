@@ -2127,6 +2127,8 @@ viewSaved.addEventListener('click', async () => {
       const idx = registry.findIndex(p => p.id === sp.id);
       if (idx >= 0) registry[idx] = sp; else registry.push(sp);
     });
+    const serverIds = new Set(serverPatients.map(sp => sp.id));
+    registry = registry.filter(p => serverIds.has(p.id));
     localStorage.setItem(KEY_REGISTRY, JSON.stringify(registry));
   } catch (err) {
     console.warn('Could not fetch server patient list, showing local data:', err.message);
@@ -2149,6 +2151,8 @@ todaySummaryBtn.addEventListener('click', async () => {
       const idx = registry.findIndex(p => p.id === sp.id);
       if (idx >= 0) registry[idx] = sp; else registry.push(sp);
     });
+    const serverIds = new Set(serverPatients.map(sp => sp.id));
+    registry = registry.filter(p => serverIds.has(p.id));
     localStorage.setItem(KEY_REGISTRY, JSON.stringify(registry));
   } catch (err) {
     console.warn('Could not fetch server patient list, showing local data:', err.message);
