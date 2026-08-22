@@ -2861,7 +2861,7 @@ function scheduleSave(){
   clearTimeout(saveTimer);
   saveTimer=setTimeout(()=>saveBill(false), 700);
 }
-function saveBill(manual){
+async function saveBill(manual){
   const bill=collectBill();
   const hasPatientDetails = !!(bill.name && bill.name.trim());
   const grandTotal = parseFloat(String(bill.total || '0').replace(/,/g,'')) || 0;
@@ -2880,7 +2880,7 @@ function saveBill(manual){
     dirty=false;
     updateBillTimestamp(bill.updatedAt);
     bumpUnbacked();
-    syncBillToServer(bill, manual);
+    await syncBillToServer(bill, manual);
   }else{
     setSaveStatus('error');
     toast('Save failed — your browser storage may be full or private-mode is blocking saves. Use Backup JSON to keep this bill safe.',true);
@@ -2903,7 +2903,7 @@ function clearPendingSync(no){
 }
 
 function syncBillToServer(bill, manual){
-  apiFetch('/api/bills', { method:'POST', body: bill }).then(() => {
+  return apiFetch('/api/bills', { method:'POST', body: bill }).then(() => {
     clearPendingSync(bill.no);
     setSaveStatus('saved');
     if(manual) toast(`Bill ${bill.no} saved.`);
@@ -3465,9 +3465,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Replaces the old iframe + URL-param handoff. Same page, same JS scope now,
 // so there is no "linked patient" state that can ever go stale or desync -
 // every open explicitly loads the right bill for the patient on screen.
+async function flushPendingSave(){
+  if(dirty){
+    clearTimeout(saveTimer);
+    await saveBill(false);
+  }
+}
 async function openBillSection(exactNo, forceNew) {
   const uhid = uhidEl.value;
   if (!uhid) { alert('Pehle UHID generate hone do.'); return; }
+  await flushPendingSave();
   document.getElementById('billSection').style.display = 'block';
   document.body.style.overflow = 'hidden';
   linkedPatientUHID = uhid;
