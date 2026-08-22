@@ -9,6 +9,24 @@ app.use('*', cors());
 app.get('/api/health', (c) => c.json({ ok: true, service: 'jkh-dental-suite' }));
 
 /* =========================================================
+   BILLING PASSWORD LOCK — only the doctor's device (which knows
+   BILLING_SECRET) can read or write billing data. Reception and
+   any other page never see this header, so /api/bills is invisible
+   to them at the server level, not just hidden in the UI.
+   ========================================================= */
+async function requireBillingAuth(c, next) {
+  const key = c.req.header('X-Billing-Key') || '';
+  if (!c.env.BILLING_SECRET || key !== c.env.BILLING_SECRET) {
+    return c.json({ error: 'Billing password required' }, 401);
+  }
+  await next();
+}
+app.use('/api/bills', requireBillingAuth);
+app.use('/api/bills/*', requireBillingAuth);
+app.use('/api/next-billno', requireBillingAuth);
+app.use('/api/billing-auth-check', requireBillingAuth);
+
+/* =========================================================
    MASTER PROCEDURE LIST (shared by OPD form + Billing)
    ========================================================= */
 
@@ -276,6 +294,10 @@ app.delete('/api/opd-tokens/:id', async (c) => {
 /* =========================================================
    BILLING
    ========================================================= */
+
+// Password-check only — no data read/write, so logging in never
+// wastes a bill number or touches any record.
+app.get('/api/billing-auth-check', (c) => c.json({ ok: true }));
 
 app.get('/api/bills', async (c) => {
   const includeTrash = c.req.query('trash') === '1';
